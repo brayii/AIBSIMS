@@ -1,33 +1,25 @@
 @startuml
-title Adult Female Bunny FSM
+title Juvenile Bunny FSM
 
 [*] --> AgeUp : Turn start
 
 state AgeUp {
-  [*] --> CheckMutantProximity
+  [*] --> CheckAge
 }
 
-state CheckMutantProximity <<decision>> {
-  [*] --> MutantNearby : if mutant is adjacent
-  [*] --> Safe : if no mutant adjacent
+state CheckAge <<decision>> {
+  [*] --> BecomeAdult : if age >= 2
+  [*] --> CheckMutationRisk : if age < 2
 }
 
-MutantNearby --> MoveAway : move to empty tile opposite mutant
-MoveAway --> CheckMate
-
-Safe --> CheckMate
-
-state CheckMate <<decision>> {
-  [*] --> MateNearby : if adult male adjacent
-  [*] --> NoMate : if no adult male
+state CheckMutationRisk <<decision>> {
+  [*] --> MutantAdjacent : if vampire is adjacent
+  [*] --> Safe : otherwise
 }
 
-MateNearby --> GiveBirth : if adjacent tile is free
-GiveBirth --> LearnDefense : record protected tile
-
-NoMate --> RandomMove
-LearnDefense --> RandomMove
+MutantAdjacent --> ConvertToVampire
+Safe --> RandomMove
+ConvertToVampire --> [*]
 RandomMove --> [*]
 
 @enduml
-

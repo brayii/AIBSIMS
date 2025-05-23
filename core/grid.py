@@ -1,5 +1,5 @@
 # grid.py
-from bunny import Bunny
+from core.bunny import Bunny
 import random
 
 GRID_SIZE = 80
