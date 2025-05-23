@@ -1,5 +1,5 @@
 # main.py
-from grid import Grid
+from core.grid import Grid
 import time
 
 def main():
