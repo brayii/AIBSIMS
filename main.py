@@ -1,16 +1,26 @@
 # main.py
 from core.grid import Grid
-import time
+from core.logger import EventLogger
+from core.fsm_dispatcher import FSMDispatcher
 
-def main():
-    g = Grid()
-    turn = 0
+turn = 0
+logger = EventLogger()
+grid = Grid()
+dispatcher = FSMDispatcher()
+dispatcher.mode = "HYBRID"  # FSM, RL, HYBRID
+
+try:
     while True:
-        print(f"\n--- Turn {turn} ---")
-        g.display()
-        time.sleep(2)
-        turn += 1
-        break  # Remove this once you add movement/breeding/etc.
+        print(f"\n=== Turn {turn} ===")
+        for bunny in grid.bunnies[:]:
+            dispatcher.update_bunny(bunny, grid, turn, logger)
 
-if __name__ == "__main__":
-    main()
+        grid.display()
+        turn += 1
+        input("[ENTER] Next turn...")
+
+except KeyboardInterrupt:
+    print("\nSimulation ended.")
+finally:
+    logger.close()
+S
