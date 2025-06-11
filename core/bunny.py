@@ -1,7 +1,28 @@
 # bunny.py
 import random
+import pygame
 
 COLORS = ["white", "brown", "black", "spotted"]
+TILE_SIZE = 32  # Match this with the grid tile size
+
+COLOR_MAP = {
+    "white": (255, 255, 255),
+    "brown": (139, 69, 19),
+    "black": (30, 30, 30),
+    "spotted": (180, 180, 180)
+}
+
+def get_bunny_color(bunny):
+    base_color = COLOR_MAP.get(bunny.color, (200, 200, 200))
+    if bunny.is_mutant:
+        return (128, 0, 128)  # Vampire bunny: purple
+    elif bunny.sex == 'M':
+        return (0, 128, 255) if bunny.is_adult() else (100, 100, 255)
+    else:
+        return (255, 105, 180) if bunny.is_adult() else (255, 182, 193)
+
+def draw_bunny_icon(screen, x, y, color):
+    pygame.draw.rect(screen, color, (x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12))
 
 class Bunny:
     def __init__(self, name, sex, x, y, mutant=False, age=0):
@@ -46,3 +67,8 @@ class Bunny:
         if options:
             nx, ny = random.choice(options)
             grid.move_bunny(self, nx, ny)
+
+    def draw(self, surface, x, y):
+        color = get_bunny_color(self)
+        draw_bunny_icon(surface, x, y, color)
+
