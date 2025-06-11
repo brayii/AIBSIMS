@@ -1,67 +1,69 @@
 # core/grid.py
-import random
+
+import pygame
 from core.bunny import Bunny
 
-GRID_SIZE = 80
+TILE_SIZE = 32
+GRID_WIDTH = 20
+GRID_HEIGHT = 15
+SCREEN_WIDTH = TILE_SIZE * GRID_WIDTH
+SCREEN_HEIGHT = TILE_SIZE * GRID_HEIGHT
+
+BG_COLOR = (30, 30, 30)
+GRID_COLOR = (60, 60, 60)
 
 class Grid:
-    def __init__(self):
-        self.grid = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    def __init__(self, screen):
+        self.screen = screen
         self.bunnies = []
+        self.cells = [[None for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
         self.spawn_initial_bunnies()
 
-    def spawn_initial_bunnies(self, count=5):
-        for _ in range(count):
-            x, y = self.get_random_empty_tile()
-            sex = random.choice(['M', 'F'])
-            name = f"Bunny{len(self.bunnies)}"
-            mutant = random.random() < 0.02
-            bunny = Bunny(name, sex, x, y, mutant)
-            self.add_bunny(bunny, x, y)
+    def spawn_initial_bunnies(self):
+        # Example: place 5 random bunnies
+        import random
+        for i in range(5):
+            x, y = random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1)
+            bunny = Bunny(name=f"B{i}", sex=random.choice(['M', 'F']), x=x, y=y)
+            self.place_bunny(bunny, x, y)
 
-    def add_bunny(self, bunny, x, y):
-        bunny.x = x
-        bunny.y = y
-        bunny.grid = self
-        self.grid[y][x] = bunny
+    def place_bunny(self, bunny, x, y):
+        bunny.x, bunny.y = x, y
         self.bunnies.append(bunny)
+        self.cells[x][y] = bunny
+
+    def move_bunny(self, bunny, new_x, new_y):
+        self.cells[bunny.x][bunny.y] = None
+        bunny.x, bunny.y = new_x, new_y
+        self.cells[new_x][new_y] = bunny
 
     def remove_bunny(self, bunny):
-        if self.grid[bunny.y][bunny.x] == bunny:
-            self.grid[bunny.y][bunny.x] = None
+        self.cells[bunny.x][bunny.y] = None
         if bunny in self.bunnies:
             self.bunnies.remove(bunny)
 
-    def move_bunny(self, bunny, new_x, new_y):
-        if self.is_in_bounds(new_x, new_y) and self.grid[new_y][new_x] is None:
-            self.grid[bunny.y][bunny.x] = None
-            self.grid[new_y][new_x] = bunny
-            bunny.x, bunny.y = new_x, new_y
-
-    def get_random_empty_tile(self):
-        while True:
-            x, y = random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1)
-            if self.grid[y][x] is None:
-                return x, y
-
     def get_adjacent_empty_tiles(self, x, y):
-        dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        return [(x+dx, y+dy) for dx, dy in dirs
-                if self.is_in_bounds(x+dx, y+dy) and self.grid[y+dy][x+dx] is None]
+        candidates = [
+            (x+dx, y+dy)
+            for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]
+            if 0 <= x+dx < GRID_WIDTH and 0 <= y+dy < GRID_HEIGHT
+        ]
+        return [(cx, cy) for cx, cy in candidates if self.cells[cx][cy] is None]
 
-    def get_adjacent_bunnies(self, x, y):
-        dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        return [(x+dx, y+dy, self.grid[y+dy][x+dx])
-                for dx, dy in dirs
-                if self.is_in_bounds(x+dx, y+dy) and self.grid[y+dy][x+dx] is not None]
+    def draw_grid(self):
+        for x in range(0, SCREEN_WIDTH, TILE_SIZE):
+            pygame.draw.line(self.screen, GRID_COLOR, (x, 0), (x, SCREEN_HEIGHT))
+        for y in range(0, SCREEN_HEIGHT, TILE_SIZE):
+            pygame.draw.line(self.screen, GRID_COLOR, (0, y), (SCREEN_WIDTH, y))
 
-    def is_in_bounds(self, x, y):
-        return 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE
+    def draw_entities(self):
+        for bunny in self.bunnies:
+            px = bunny.x * TILE_SIZE
+            py = bunny.y * TILE_SIZE
+            bunny.draw(self.screen, px, py)
 
-    def display(self):
-        for y in range(GRID_SIZE):
-            row = ''
-            for x in range(GRID_SIZE):
-                bunny = self.grid[y][x]
-                row += bunny.display_char() if bunny else '.'
-            print(row)
+    def update(self):
+        self.screen.fill(BG_COLOR)
+        self.draw_grid()
+        self.draw_entities()
+        pygame.display.flip()
