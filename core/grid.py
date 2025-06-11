@@ -1,6 +1,7 @@
 # core/grid.py
 
 import pygame
+import random
 from core.bunny import Bunny
 
 TILE_SIZE = 32
@@ -20,12 +21,21 @@ class Grid:
         self.spawn_initial_bunnies()
 
     def spawn_initial_bunnies(self):
-        # Example: place 5 random bunnies
-        import random
-        for i in range(5):
-            x, y = random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1)
-            bunny = Bunny(name=f"B{i}", sex=random.choice(['M', 'F']), x=x, y=y)
-            self.place_bunny(bunny, x, y)
+        # Spawn two female-male pairs near each other
+        pairs = [("F", "M"), ("F", "M")]
+        for i, (s1, s2) in enumerate(pairs):
+            x, y = random.randint(0, self.GRID_WIDTH - 2), random.randint(0, self.GRID_HEIGHT - 2)
+            b1 = Bunny(name=f"B{i*2}", sex=s1, x=x, y=y)
+            b2 = Bunny(name=f"B{i*2+1}", sex=s2, x=x+1, y=y)
+            self.place_bunny(b1, x, y)
+            self.place_bunny(b2, x+1, y)
+
+        # Optional: Add 1 juvenile for mutation testing
+        jx, jy = random.randint(0, self.GRID_WIDTH - 1), random.randint(0, self.GRID_HEIGHT - 1)
+        if self.cells[jx][jy] is None:
+            juvenile = Bunny(name="J100", sex=random.choice(['M', 'F']), x=jx, y=jy, age=0)
+            self.place_bunny(juvenile, jx, jy)
+
 
     def place_bunny(self, bunny, x, y):
         bunny.x, bunny.y = x, y
@@ -38,17 +48,39 @@ class Grid:
         self.cells[new_x][new_y] = bunny
 
     def remove_bunny(self, bunny):
-        self.cells[bunny.x][bunny.y] = None
+        if self.cells[bunny.x][bunny.y] == bunny:
+            self.cells[bunny.x][bunny.y] = None
         if bunny in self.bunnies:
             self.bunnies.remove(bunny)
 
     def get_adjacent_empty_tiles(self, x, y):
-        candidates = [
-            (x+dx, y+dy)
-            for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]
-            if 0 <= x+dx < GRID_WIDTH and 0 <= y+dy < GRID_HEIGHT
+        directions = [(-1,0), (1,0), (0,-1), (0,1)]
+        return [
+            (nx, ny)
+            for dx, dy in directions
+            if 0 <= (nx := x + dx) < GRID_WIDTH and 0 <= (ny := y + dy) < GRID_HEIGHT
+            and self.cells[nx][ny] is None
         ]
-        return [(cx, cy) for cx, cy in candidates if self.cells[cx][cy] is None]
+
+    def find_adjacent_entities(self, x, y):
+        adjacent = []
+        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                entity = self.cells[nx][ny]
+                if entity:
+                    adjacent.append(entity)
+        return adjacent
+
+    def move_toward(self, bunny, tx, ty):
+        dx = 1 if tx > bunny.x else -1 if tx < bunny.x else 0
+        dy = 1 if ty > bunny.y else -1 if ty < bunny.y else 0
+        options = [(bunny.x + dx, bunny.y), (bunny.x, bunny.y + dy)]
+        for nx, ny in options:
+            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT and self.cells[nx][ny] is None:
+                self.move_bunny(bunny, nx, ny)
+                return
+        bunny.move_random(self)  # fallback
 
     def draw_grid(self):
         for x in range(0, SCREEN_WIDTH, TILE_SIZE):
@@ -67,3 +99,15 @@ class Grid:
         self.draw_grid()
         self.draw_entities()
         pygame.display.flip()
+
+    @property
+    def GRID_WIDTH(self):
+        return GRID_WIDTH
+
+    @property
+    def GRID_HEIGHT(self):
+        return GRID_HEIGHT
+    
+    @property
+    def TILE_SIZE(self):
+        return TILE_SIZE
