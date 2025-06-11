@@ -35,7 +35,13 @@ def main():
             for bunny in bunnies:
                 bunny.update(grid, turn, logger)
                 dispatcher.update_bunny(bunny, grid, turn, logger)
-
+            
+            # Check for extinction
+            if len(grid.bunnies) == 0:
+                print(f"Simulation ended at turn {turn} — all bunnies are gone.")
+                running = False
+                break
+            
             # Draw grid and bunnies
             grid.update()
 
