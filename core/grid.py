@@ -71,7 +71,18 @@ class Grid:
                 if entity:
                     adjacent.append(entity)
         return adjacent
-
+    def get_adjacent_bunnies(self, x, y):
+        """Return a list of bunnies adjacent (N, S, E, W) to (x, y)."""
+        neighbors = []
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                bunny = self.cells[nx][ny]
+                if bunny is not None:
+                    neighbors.append(bunny)
+        return neighbors
+    
     def move_toward(self, bunny, tx, ty):
         dx = 1 if tx > bunny.x else -1 if tx < bunny.x else 0
         dy = 1 if ty > bunny.y else -1 if ty < bunny.y else 0
