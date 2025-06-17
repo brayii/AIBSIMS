@@ -17,6 +17,17 @@ class Bunny:
     def max_age(self):
         return 50 if self.is_mutant else 10
 
+    def make_baby(self, x, y):
+        """Create a new Bunny at position (x, y) with inherited properties."""
+        # You can customize how babies inherit properties
+        return Bunny(
+        name=f"{self.name}_baby",
+        sex=random.choice(['F', 'M']),
+        x=x,
+        y=y,
+        mutant=False  # or inherit from parent if needed
+    )
+    
     def update(self, grid, turn, logger=None):
         self.age += 1
         if self.age > self.max_age():
