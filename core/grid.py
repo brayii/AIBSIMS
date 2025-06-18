@@ -20,15 +20,28 @@ class Grid:
         self.cells = [[None for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
         self.spawn_initial_bunnies()
 
+    def get_adjacent_offsets(self):
+        return [
+            (0, -1),
+            (0, 1),
+            (-1, 0),
+            (1, 0),
+        ]
+    
+    def in_bounds(self, x, y):
+        return 0 <= x < self.GRID_WIDTH and 0 <= y < self.GRID_HEIGHT
+
+
     def spawn_initial_bunnies(self):
-        # Spawn two female-male pairs near each other
+        # Spawn two female-male pairs near each other        
         pairs = [("F", "M"), ("F", "M")]
         for i, (s1, s2) in enumerate(pairs):
             x, y = random.randint(0, self.GRID_WIDTH - 2), random.randint(0, self.GRID_HEIGHT - 2)
-            b1 = Bunny(name=f"B{i*2}", sex=s1, x=x, y=y)
-            b2 = Bunny(name=f"B{i*2+1}", sex=s2, x=x+1, y=y)
+            b1 = Bunny(name=f"B{i*2}", sex=s1, x=x, y=y, age=3)
+            b2 = Bunny(name=f"B{i*2+1}", sex=s2, x=x+1, y=y, age=3)
             self.place_bunny(b1, x, y)
-            self.place_bunny(b2, x+1, y)
+            self.place_bunny(b2, x+1, y=y)
+
 
         # Optional: Add 1 juvenile for mutation testing
         jx, jy = random.randint(0, self.GRID_WIDTH - 1), random.randint(0, self.GRID_HEIGHT - 1)
@@ -46,6 +59,11 @@ class Grid:
         self.cells[bunny.x][bunny.y] = None
         bunny.x, bunny.y = new_x, new_y
         self.cells[new_x][new_y] = bunny
+
+    def add_bunny(self, bunny):
+        if self.in_bounds(bunny.x, bunny.y) and self.cells[bunny.x][bunny.y] is None:
+            self.cells[bunny.x][bunny.y] = bunny
+            self.bunnies.append(bunny)
 
     def remove_bunny(self, bunny):
         if self.cells[bunny.x][bunny.y] == bunny:

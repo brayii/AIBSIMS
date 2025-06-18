@@ -32,17 +32,24 @@ def reward_func_female(bunny, grid):
 
 
 class FSMDispatcher:
-    def __init__(self, mode="FSM"):
+    def __init__(self, mode="RL"):
         self.mode = mode  # "FSM" or "RL"
         self.rl_agents = {}
 
     def update_bunny(self, bunny, grid, turn, logger=None):
         if self.mode == "RL":
-            if bunny.sex == 'F' and bunny.is_adult():
-                if bunny.name not in self.rl_agents:
-                    self.rl_agents[bunny.name] = BunnyRLAgent(bunny)
-                self.rl_agents[bunny.name].step(grid, turn, logger, reward_func_female)
-                return
+            if bunny.sex == 'F' and bunny.is_adult() and not bunny.is_mutant:
+                adjacent = grid.get_adjacent_bunnies(bunny.x, bunny.y)
+                male_adj = any(b.is_adult() and b.sex == 'M' and not b.is_mutant for b in adjacent)
+                if male_adj:
+                    for dx, dy in grid.get_adjacent_offsets():
+                        nx, ny = bunny.x + dx, bunny.y + dy
+                        if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
+                            baby = bunny.make_baby(nx, ny)
+                            grid.add_bunny(baby)
+                            logger.log(turn, "birth", baby, f"child of {bunny.name}", controller="FSM")
+                            break
+
 
             # All other bunnies fallback to FSM
             if bunny.is_mutant:
@@ -86,6 +93,10 @@ class FSMDispatcher:
                 grid.place_bunny(baby, nx, ny)
                 if logger:
                     logger.log(turn, "birth", baby, f"by {bunny.name}")
+            else:
+                if logger:
+                    logger.log(turn, "blocked", bunny, "wanted to give birth but no empty adjacent tile")
+        
         bunny.move_random(grid)
 
     def adult_male_behavior(self, bunny, grid, turn, logger):
