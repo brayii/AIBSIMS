@@ -13,12 +13,36 @@ SCREEN_HEIGHT = TILE_SIZE * GRID_HEIGHT
 BG_COLOR = (30, 30, 30)
 GRID_COLOR = (60, 60, 60)
 
+
 class Grid:
     def __init__(self, screen):
         self.screen = screen
         self.bunnies = []
         self.cells = [[None for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
         self.spawn_initial_bunnies()
+        self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
+
+
+    def get_bunny_at(self, x, y):
+        """Safe access: return the bunny at (x, y) or None if out-of-bounds or empty."""
+        if not self.in_bounds(x, y):
+            return None
+        try:
+            return self.cells[y][x]  # [row][col]
+        except IndexError:
+            return None
+
+    def nearest_vampire_distance(self, x, y):
+        """Return the Manhattan distance to the nearest vampire from (x, y), or None if none found."""
+        min_dist = None
+        for bx in range(self.GRID_WIDTH):
+            for by in range(self.GRID_HEIGHT):
+                bunny = self.cells[bx][by]
+                if bunny is not None and getattr(bunny, "is_mutant", False):
+                    dist = abs(bx - x) + abs(by - y)
+                    if min_dist is None or dist < min_dist:
+                        min_dist = dist
+        return min_dist
 
     def get_adjacent_offsets(self):
         return [
@@ -29,6 +53,7 @@ class Grid:
         ]
     
     def in_bounds(self, x, y):
+        """Return True if (x, y) is within the grid bounds."""
         return 0 <= x < self.GRID_WIDTH and 0 <= y < self.GRID_HEIGHT
 
 
@@ -128,6 +153,10 @@ class Grid:
         self.draw_grid()
         self.draw_entities()
         pygame.display.flip()
+    
+    def get_all_bunnies(self):
+        return list(self.bunnies)
+
 
     @property
     def GRID_WIDTH(self):
@@ -140,3 +169,30 @@ class Grid:
     @property
     def TILE_SIZE(self):
         return TILE_SIZE
+
+# --- Female Heatmap for Mating Strategy ---
+
+class FemaleHeatmap:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.data = [[0.0 for _ in range(height)] for _ in range(width)]
+
+    def decay(self):
+        for x in range(self.width):
+            for y in range(self.height):
+                self.data[x][y] *= 0.95
+
+    def update_from_sightings(self, bunnies):
+        for b in bunnies:
+            if b.sex == 'F' and b.is_adult() and not b.is_mutant:
+                self.data[b.x][b.y] += 1.0
+
+    def best_tile(self):
+        flat = [((x, y), self.data[x][y]) for x in range(self.width) for y in range(self.height)]
+        return max(flat, key=lambda kv: kv[1])[0]
+
+
+    def best_tile_value(self):
+        x, y = self.best_tile()
+        return self.data[x][y]

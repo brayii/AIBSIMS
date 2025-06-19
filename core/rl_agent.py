@@ -3,13 +3,35 @@
 import random
 from collections import defaultdict
 import numpy as np
+import pickle
+import os
+
+def save_all_agents(agent_dict, path="q_tables/"):
+    os.makedirs(path, exist_ok=True)
+    for name, agent in agent_dict.items():
+        with open(f"{path}{name}.pkl", "wb") as f:
+            pickle.dump(agent.q_table, f)
+
+def load_agent_qtable(name, path="q_tables/"):
+    file_path = f"{path}{name}.pkl"
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "rb") as f:
+                return pickle.load(f)
+        except EOFError:
+            print(f"[WARN] Q-table for {name} is empty or corrupted.")
+            return None
+    else:
+        print(f"[INFO] No Q-table found for {name}, starting fresh.")
+    return None
+
 
 
 
 class BunnyRLAgent:
     def __init__(self, bunny):
         self.bunny = bunny
-        self.q_table = defaultdict(lambda: [0.0] * self.num_actions())
+        self.q_table = {}
         self.epsilon = 0.1
         self.alpha = 0.2
         self.gamma = 0.95
@@ -21,20 +43,33 @@ class BunnyRLAgent:
 
     def get_state(self, grid):
         x, y = self.bunny.x, self.bunny.y
-        age_group = 0 if self.bunny.age < 2 else 1 if self.bunny.age < 8 else 2
+        age = self.bunny.age
 
-        adj = grid.get_adjacent_bunnies(x, y)
-        num_males = sum(1 for b in adj if b.sex == 'M' and not b.is_mutant)
-        num_females = sum(1 for b in adj if b.sex == 'F' and not b.is_mutant)
-        num_vampires = sum(1 for b in adj if b.is_mutant)
-        is_near_edge = int(x == 0 or y == 0 or x == grid.GRID_WIDTH - 1 or y == grid.GRID_HEIGHT - 1)
+        adjacent = grid.get_adjacent_bunnies(x, y)
+        female_adj = any(b.sex == 'F' and b.is_adult() for b in adjacent)
+        male_adj = any(b.sex == 'M' and b.is_adult() for b in adjacent)
+        vampire_near = any(b.is_mutant for b in adjacent)
 
-        return (age_group, num_males, num_females, num_vampires, is_near_edge)
+        heat = int(grid.female_heatmap.data[x][y] > 1.0)
+        empty = len(grid.get_adjacent_empty_tiles(x, y)) > 0
+        near_edge = int(x == 0 or y == 0 or x == grid.GRID_WIDTH - 1 or y == grid.GRID_HEIGHT - 1)
 
+        if self.bunny.sex == 'F':
+            return (age // 4, self.bunny.has_baby, vampire_near, male_adj, empty, near_edge)
+
+        else:  # Male-specific state
+            return (age // 4, female_adj, vampire_near, heat, empty)
+
+       
     def choose_action(self, state):
+        if state not in self.q_table:
+            self.q_table[state] = [0.0] * 5  # Ensure the value is a plain list (no lambda)
+
+        # Epsilon-greedy selection
         if random.random() < self.epsilon:
-            return random.randint(0, self.num_actions() - 1)
-        return int(np.argmax(self.q_table[state]))
+            return random.randint(0, 4)  # Explore: random action
+        return max(range(5), key=lambda a: self.q_table[state][a])  # Exploit: best known action
+
 
     def update_q(self, s, a, r, s_prime):
         max_future = max(self.q_table[s_prime])
