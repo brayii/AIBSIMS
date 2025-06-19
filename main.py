@@ -5,6 +5,7 @@ import time
 from core.grid import Grid, SCREEN_WIDTH, SCREEN_HEIGHT
 from core.fsm_dispatcher import FSMDispatcher
 from core.logger import EventLogger
+from core.rl_agent import save_all_agents
 
 def main():
     pygame.init()
@@ -31,6 +32,10 @@ def main():
         if turn == 0 or pygame.time.get_ticks() % 500 < 20:
             turn += 1
 
+            # Update heatmap before agent logic
+            grid.female_heatmap.decay()
+            grid.female_heatmap.update_from_sightings(grid.get_all_bunnies())
+
             bunnies = list(grid.bunnies)  # avoid mutation during loop
             for bunny in bunnies:
                 bunny.update(grid, turn, logger)
@@ -52,6 +57,9 @@ def main():
 
     logger.close()
     pygame.quit()
+    save_all_agents(dispatcher.rl_agents)
+    print("[INFO] RL agents saved.")
+
 
 if __name__ == "__main__":
     main()
