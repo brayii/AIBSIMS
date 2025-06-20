@@ -14,7 +14,7 @@ def main():
 
     grid = Grid(screen)
     dispatcher = FSMDispatcher()
-    logger = EventLogger()
+    #logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
     clock = pygame.time.Clock()
@@ -38,8 +38,10 @@ def main():
 
             bunnies = list(grid.bunnies)  # avoid mutation during loop
             for bunny in bunnies:
-                bunny.update(grid, turn, logger)
-                dispatcher.update_bunny(bunny, grid, turn, logger)
+                #bunny.update(grid, turn, logger)
+                bunny.update(grid, turn, None)
+                #dispatcher.update_bunny(bunny, grid, turn, logger)
+                dispatcher.update_bunny(bunny, grid, turn, None)
             
             # Check for extinction
             if len(grid.bunnies) == 0:
@@ -55,7 +57,7 @@ def main():
             screen.blit(info, (10, 10))
             pygame.display.flip()
 
-    logger.close()
+    #logger.close()
     pygame.quit()
     save_all_agents(dispatcher.rl_agents)
     print("[INFO] RL agents saved.")
