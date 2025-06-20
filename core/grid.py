@@ -21,6 +21,8 @@ class Grid:
         self.cells = [[None for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
         self.spawn_initial_bunnies()
         self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
+        self.total_bunny_births = 0
+        self.total_vampire_births = 0
 
 
     def get_bunny_at(self, x, y):
@@ -43,6 +45,16 @@ class Grid:
                     if min_dist is None or dist < min_dist:
                         min_dist = dist
         return min_dist
+    
+    def is_vampire_in_range(self, x, y, radius=3):
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                nx, ny = x + dx, y + dy
+                if self.in_bounds(nx, ny):
+                    bunny = self.cells[nx][ny]
+                    if bunny and bunny.is_mutant:
+                        return True
+        return False
 
     def get_adjacent_offsets(self):
         return [

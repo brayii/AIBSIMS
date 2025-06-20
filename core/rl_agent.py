@@ -48,7 +48,8 @@ class BunnyRLAgent:
         adjacent = grid.get_adjacent_bunnies(x, y)
         female_adj = any(b.sex == 'F' and b.is_adult() for b in adjacent)
         male_adj = any(b.sex == 'M' and b.is_adult() for b in adjacent)
-        vampire_near = any(b.is_mutant for b in adjacent)
+        #vampire_near = any(b.is_mutant for b in adjacent)
+        vampire_near = grid.is_vampire_in_range(x, y, radius=3)
 
         heat = int(grid.female_heatmap.data[x][y] > 1.0)
         empty = len(grid.get_adjacent_empty_tiles(x, y)) > 0

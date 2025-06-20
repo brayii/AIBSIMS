@@ -11,6 +11,7 @@ class Bunny:
         self.is_mutant = mutant
         self.state = "IDLE"  # initial FSM state for adult females
         self.has_baby = False  # Tracks recent birth
+        self.adult = False
         self.color = (255, 0, 0) if mutant else (0, 0, 255) if sex == 'M' else (255, 105, 180)
 
     def is_adult(self):
@@ -19,10 +20,19 @@ class Bunny:
     def max_age(self):
         return 50 if self.is_mutant else 10
 
-    def make_baby(self, x, y):
-        """Create a new Bunny at position (x, y) with inherited properties."""
+    def make_baby(self, x, y, grid=None):
         self.has_baby = True
-        is_mutant = random.random() < 0.02  # 2% spontaneous vampire birth
+        is_mutant = False       
+        if grid:
+            grid.total_bunny_births += 1
+            birth_rate = grid.total_vampire_births / grid.total_bunny_births if grid.total_bunny_births > 0 else 0
+            if birth_rate < 0.02:
+                if random.random() < 0.02:
+                    is_mutant = True
+                    grid.total_vampire_births += 1
+        else:
+            # fallback logic if grid is not passed
+            is_mutant = random.random() < 0.02      
         return Bunny(
             name=f"{self.name}_baby",
             sex=random.choice(['F', 'M']),
@@ -30,7 +40,6 @@ class Bunny:
             y=y,
             mutant=is_mutant
         )
-
     
     def update(self, grid, turn, logger=None):
         self.has_baby = False  # Clear after each turn
