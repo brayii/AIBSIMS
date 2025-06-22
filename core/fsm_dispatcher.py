@@ -146,34 +146,49 @@ def is_vampire_in_range(grid, x, y, radius=2):
     return False
 
 class FSMDispatcher:
-    def __init__(self, mode="RL"):
+    def __init__(self, mode="FSM"):
         self.mode = mode  # "FSM" or "RL"
         self.rl_agents = {}
+        self.shared_tables = {
+            'male': {},
+            'female': {},
+            'juvenile': {},
+            'vampire': {},
+        }
+
+        # Load shared tables if they exist
+        for btype in self.shared_tables:
+            q = load_agent_qtable(f"{btype}_shared")
+            if q:
+                self.shared_tables[btype] = q
 
     def update_bunny(self, bunny, grid, turn, logger=None):
-        if self.mode == "RL":
-            if bunny.name not in self.rl_agents:
-                agent = BunnyRLAgent(bunny)
-                q = load_agent_qtable(bunny.name)
-                if q:
-                    agent.q_table = q
-                self.rl_agents[bunny.name] = agent
-
-            if bunny.is_mutant:
-                self.vampire_behavior_rl(bunny, grid, turn, logger)
-                self.rl_agents[bunny.name].step(grid, turn, logger, reward_func_vampire)
-            elif not bunny.is_adult():
-                self.juvenile_behavior(bunny, grid, turn, logger)
-                self.rl_agents[bunny.name].step(grid, turn, logger, reward_func_juvenile)
-            elif bunny.sex == "M":
-                self.adult_male_behavior(bunny, grid, turn, logger)
-                self.rl_agents[bunny.name].step(grid, turn, logger, reward_func_male)
-            else:
-                self.adult_female_behavior(bunny, grid, turn, logger)
-                self.rl_agents[bunny.name].step(grid, turn, logger, reward_func_female)
-
+        # Determine bunny type and reward function — used in both FSM and RL
+        if bunny.is_mutant:
+            btype = 'vampire'
+            reward_fn = reward_func_vampire
+        elif not bunny.is_adult():
+            btype = 'juvenile'
+            reward_fn = reward_func_juvenile
+        elif bunny.sex == "M":
+            btype = 'male'
+            reward_fn = reward_func_male
         else:
-            # FSM only mode
+            btype = 'female'
+            reward_fn = reward_func_female
+
+        # Ensure agent exists (used even in FSM mode for training)
+        if bunny.name not in self.rl_agents:
+            self.rl_agents[bunny.name] = BunnyRLAgent(bunny, self.shared_tables[btype])
+        agent = self.rl_agents[bunny.name]
+
+        if self.mode == "RL":
+            agent.step(grid, turn, logger, reward_fn)
+        else:
+            # FSM Mode — still collect RL experience
+            s = agent.get_state(grid)
+
+            # FSM behavior execution
             if bunny.is_mutant:
                 self.vampire_behavior(bunny, grid, turn, logger)
             elif not bunny.is_adult():
@@ -182,6 +197,12 @@ class FSMDispatcher:
                 self.adult_male_behavior(bunny, grid, turn, logger)
             else:
                 self.adult_female_behavior(bunny, grid, turn, logger)
+
+            # Update Q-table based on FSM decision as if action 5 was taken
+            s_prime = agent.get_state(grid)
+            r = reward_fn(bunny, grid)
+            agent.update_q(s, 5, r, s_prime)
+
 
 
     def juvenile_behavior(self, bunny, grid, turn, logger):
@@ -235,8 +256,9 @@ class FSMDispatcher:
         elif males:
             bunny.state = "SEEK_MATE"
         else:
-            bunny.state = "IDLE"
-
+            bunny.state = "IDLE"  # No action needed
+        
+        
         if logger:
             logger.log(turn, "state", bunny, f"FSM: {bunny.state}")
 

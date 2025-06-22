@@ -1,16 +1,15 @@
 # core/rl_agent.py
 
 import random
-from collections import defaultdict
-import numpy as np
 import pickle
 import os
 
-def save_all_agents(agent_dict, path="q_tables/"):
+def save_all_agents(agent_dict, path="q_tables/", shared=False):
     os.makedirs(path, exist_ok=True)
-    for name, agent in agent_dict.items():
-        with open(f"{path}{name}.pkl", "wb") as f:
-            pickle.dump(agent.q_table, f)
+    for name, q_table in agent_dict.items():
+        filename = f"{name}_shared.pkl" if shared else f"{name}.pkl"
+        with open(os.path.join(path, filename), "wb") as f:
+            pickle.dump(q_table, f)
 
 def load_agent_qtable(name, path="q_tables/"):
     file_path = f"{path}{name}.pkl"
@@ -21,17 +20,12 @@ def load_agent_qtable(name, path="q_tables/"):
         except EOFError:
             print(f"[WARN] Q-table for {name} is empty or corrupted.")
             return None
-    else:
-        print(f"[INFO] No Q-table found for {name}, starting fresh.")
     return None
 
-
-
-
 class BunnyRLAgent:
-    def __init__(self, bunny):
+    def __init__(self, bunny, shared_q_table):
         self.bunny = bunny
-        self.q_table = {}
+        self.q_table = shared_q_table
         self.epsilon = 0.1
         self.alpha = 0.2
         self.gamma = 0.95
@@ -39,61 +33,110 @@ class BunnyRLAgent:
         self.last_action = None
 
     def num_actions(self):
-        return 5  # 0: N, 1: S, 2: E, 3: W, 4: Do Nothing
+        return 6  # 0–4: directions, 5: role action
 
     def get_state(self, grid):
         x, y = self.bunny.x, self.bunny.y
-        age = self.bunny.age
-
+        age_bin = min(self.bunny.age // 3, 4)
         adjacent = grid.get_adjacent_bunnies(x, y)
-        female_adj = any(b.sex == 'F' and b.is_adult() for b in adjacent)
-        male_adj = any(b.sex == 'M' and b.is_adult() for b in adjacent)
-        #vampire_near = any(b.is_mutant for b in adjacent)
+        empty = bool(grid.get_adjacent_empty_tiles(x, y))
         vampire_near = grid.is_vampire_in_range(x, y, radius=3)
 
-        heat = int(grid.female_heatmap.data[x][y] > 1.0)
-        empty = len(grid.get_adjacent_empty_tiles(x, y)) > 0
-        near_edge = int(x == 0 or y == 0 or x == grid.GRID_WIDTH - 1 or y == grid.GRID_HEIGHT - 1)
+        if self.bunny.is_mutant:
+            return ('vampire', age_bin, empty, vampire_near)
+        elif not self.bunny.is_adult():
+            return ('juvenile', age_bin, vampire_near, empty)
+        elif self.bunny.sex == 'F':
+            male_adj = any(b.sex == 'M' and b.is_adult() for b in adjacent)
+            return (
+                'female',
+                age_bin,
+                int(self.bunny.has_baby),
+                vampire_near,
+                male_adj,
+                empty
+            )
+        else:  # male
+            female_adj = any(b.sex == 'F' and b.is_adult() for b in adjacent)
+            heat = int(grid.female_heatmap.data[x][y] > 1.0)
+            return (
+                'male',
+                age_bin,
+                female_adj,
+                vampire_near,
+                heat,
+                empty
+            )
 
-        if self.bunny.sex == 'F':
-            return (age // 4, self.bunny.has_baby, vampire_near, male_adj, empty, near_edge)
-
-        else:  # Male-specific state
-            return (age // 4, female_adj, vampire_near, heat, empty)
-
-       
     def choose_action(self, state):
         if state not in self.q_table:
-            self.q_table[state] = [0.0] * 5  # Ensure the value is a plain list (no lambda)
-
-        # Epsilon-greedy selection
+            self.q_table[state] = [0.0] * self.num_actions()
         if random.random() < self.epsilon:
-            return random.randint(0, 4)  # Explore: random action
-        return max(range(5), key=lambda a: self.q_table[state][a])  # Exploit: best known action
-
+            return random.randint(0, self.num_actions() - 1)
+        return max(range(self.num_actions()), key=lambda a: self.q_table[state][a])
 
     def update_q(self, s, a, r, s_prime):
+        if s not in self.q_table:
+            self.q_table[s] = [0.0] * self.num_actions()
+        if s_prime not in self.q_table:
+            self.q_table[s_prime] = [0.0] * self.num_actions()
+
         max_future = max(self.q_table[s_prime])
         self.q_table[s][a] += self.alpha * (r + self.gamma * max_future - self.q_table[s][a])
 
-    def act(self, action, grid):
-        dxdy = [(0, -1), (0, 1), (1, 0), (-1, 0), (0, 0)]  # N, S, E, W, Do Nothing
-        dx, dy = dxdy[action]
-        nx, ny = self.bunny.x + dx, self.bunny.y + dy
 
-        if 0 <= nx < grid.GRID_WIDTH and 0 <= ny < grid.GRID_HEIGHT and grid.cells[nx][ny] is None:
-            grid.move_bunny(self.bunny, nx, ny)
+    def act(self, action, grid):
+        if action in range(5):
+            dx, dy = [(0, -1), (0, 1), (1, 0), (-1, 0), (0, 0)][action]
+            nx, ny = self.bunny.x + dx, self.bunny.y + dy
+            if 0 <= nx < grid.GRID_WIDTH and 0 <= ny < grid.GRID_HEIGHT and grid.cells[nx][ny] is None:
+                grid.move_bunny(self.bunny, nx, ny)
+        elif action == 5:
+            if self.bunny.is_mutant:
+                self.infect(grid)
+            elif not self.bunny.is_adult():
+                self.flee_from_vampires(grid)
+            elif self.bunny.sex == 'F':
+                self.birth(grid)
+
+    def infect(self, grid):
+        neighbors = grid.get_adjacent_bunnies(self.bunny.x, self.bunny.y)
+        victims = [b for b in neighbors if not b.is_mutant]
+        if victims:
+            victim = random.choice(victims)
+            victim.is_mutant = True
+
+    def birth(self, grid):
+        neighbors = grid.get_adjacent_bunnies(self.bunny.x, self.bunny.y)
+        males = [b for b in neighbors if b.sex == 'M' and b.is_adult() and not b.is_mutant]
+        empty_tiles = grid.get_adjacent_empty_tiles(self.bunny.x, self.bunny.y)
+        if males and empty_tiles:
+            nx, ny = random.choice(empty_tiles)
+            baby = self.bunny.make_baby(nx, ny, grid=grid)
+            grid.place_bunny(baby, nx, ny)
+            self.bunny.has_baby = True
+
+    def flee_from_vampires(self, grid):
+        threats = [b for b in grid.get_adjacent_bunnies(self.bunny.x, self.bunny.y) if b.is_mutant]
+        safe_tiles = grid.get_adjacent_empty_tiles(self.bunny.x, self.bunny.y)
+        best_tile = None
+        max_dist = -1
+        for (tx, ty) in safe_tiles:
+            dist = grid.nearest_vampire_distance(tx, ty)
+            if dist is not None and dist > max_dist:
+                best_tile = (tx, ty)
+                max_dist = dist
+        if best_tile:
+            grid.move_bunny(self.bunny, *best_tile)
+        else:
+            self.bunny.move_random(grid)
 
     def step(self, grid, turn, logger, reward_func):
         state = self.get_state(grid)
         action = self.choose_action(state)
         self.act(action, grid)
-
         reward = reward_func(self.bunny, grid)
-
         if self.last_state is not None and self.last_action is not None:
             self.update_q(self.last_state, self.last_action, reward, state)
-
         self.last_state = state
         self.last_action = action
-
