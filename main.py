@@ -20,6 +20,8 @@ def main():
     clock = pygame.time.Clock()
 
     turn = 0
+    max_population = 0
+
     running = True
     while running:
         clock.tick(60)  # max frame rate
@@ -31,7 +33,7 @@ def main():
         # Simulation step every 500ms
         if turn == 0 or pygame.time.get_ticks() % 500 < 20:
             turn += 1
-
+                    
             # Update heatmap before agent logic
             grid.female_heatmap.decay()
             grid.female_heatmap.update_from_sightings(grid.get_all_bunnies())
@@ -53,13 +55,15 @@ def main():
             grid.update()
 
             # HUD: Turn count and population
-            info = font.render(f"Turn: {turn}  Population: {len(grid.bunnies)}", True, (255, 255, 255))
+            current_population = len(grid.bunnies)
+            max_population = max(max_population, current_population)
+            info = font.render(f"Turn: {turn}  Population: {current_population}  Max: {max_population}", True, (255, 255, 255))
             screen.blit(info, (10, 10))
             pygame.display.flip()
 
     #logger.close()
     pygame.quit()
-    save_all_agents(dispatcher.rl_agents)
+    save_all_agents(dispatcher.rl_agents,shared=True)
     print("[INFO] RL agents saved.")
 
 

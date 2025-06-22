@@ -20,19 +20,28 @@ class Bunny:
     def max_age(self):
         return 50 if self.is_mutant else 10
 
-    def make_baby(self, x, y, grid=None):
+    def make_baby(self, x, y, grid=None, turn=None):
         self.has_baby = True
-        is_mutant = False       
-        if grid:
+        is_mutant = False
+    
+        if grid and turn is not None:
             grid.total_bunny_births += 1
             birth_rate = grid.total_vampire_births / grid.total_bunny_births if grid.total_bunny_births > 0 else 0
-            if birth_rate < 0.02:
-                if random.random() < 0.02:
-                    is_mutant = True
-                    grid.total_vampire_births += 1
+    
+            allowed_to_mutate = (
+                turn >= 50 and
+                birth_rate < 0.02 and
+                (turn - grid.last_vampire_birth_turn) >= 50
+            )
+    
+            if allowed_to_mutate and random.random() < 0.02:
+                is_mutant = True
+                grid.total_vampire_births += 1
+                grid.last_vampire_birth_turn = turn
         else:
-            # fallback logic if grid is not passed
-            is_mutant = random.random() < 0.02      
+            # fallback (guarantees baby is born)
+            is_mutant = random.random() < 0.02
+    
         return Bunny(
             name=f"{self.name}_baby",
             sex=random.choice(['F', 'M']),
@@ -40,6 +49,8 @@ class Bunny:
             y=y,
             mutant=is_mutant
         )
+
+
     
     def update(self, grid, turn, logger=None):
         self.has_baby = False  # Clear after each turn
