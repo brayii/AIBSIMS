@@ -184,6 +184,7 @@ class FSMDispatcher:
 
         if self.mode == "RL":
             agent.step(grid, turn, logger, reward_fn)
+            reward = reward_fn(bunny, grid)  # you could capture this inside step() as well
         else:
             # FSM Mode — still collect RL experience
             s = agent.get_state(grid)
@@ -201,7 +202,9 @@ class FSMDispatcher:
             # Update Q-table based on FSM decision as if action 5 was taken
             s_prime = agent.get_state(grid)
             r = reward_fn(bunny, grid)
+            reward = reward_fn(bunny, grid)
             agent.update_q(s, 5, r, s_prime)
+        return reward
 
 
 
