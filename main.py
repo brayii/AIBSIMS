@@ -85,8 +85,12 @@ def main():
         pygame.display.flip()
 
     #logger.close()
+    
     pygame.quit()
-    save_all_agents(dispatcher.rl_agents,shared=True)
+    
+    bunnies_trained_population = 100  # Example threshold for trained bunnies
+    if max_population >= bunnies_trained_population:
+        save_all_agents(dispatcher.rl_agents,shared=True)
     print("[INFO] RL agents saved.")
 
 

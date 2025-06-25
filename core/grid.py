@@ -34,6 +34,21 @@ class Grid:
         except IndexError:
             return None
 
+    
+    def is_empty(self, x, y):
+        return self.in_bounds(x, y) and self.get_bunny_at(x, y) is None
+
+    def get_valid_moves(self, bunny):
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, down, left, right
+        valid_moves = []
+        for dx, dy in directions:
+            nx, ny = bunny.x + dx, bunny.y + dy
+            if self.in_bounds(nx, ny) and self.get_bunny_at(nx, ny) is None:
+                if self.is_empty(nx, ny):
+                    valid_moves.append((dx, dy))
+
+        return valid_moves
+
     def nearest_vampire_distance(self, x, y):
         """Return the Manhattan distance to the nearest vampire from (x, y), or None if none found."""
         min_dist = None
@@ -126,6 +141,7 @@ class Grid:
                 if entity:
                     adjacent.append(entity)
         return adjacent
+    
     def get_adjacent_bunnies(self, x, y):
         """Return a list of bunnies adjacent (N, S, E, W) to (x, y)."""
         neighbors = []
@@ -168,6 +184,13 @@ class Grid:
     
     def get_all_bunnies(self):
         return list(self.bunnies)
+
+    def get_bunny_density_map(self):
+        heatmap = [[0 for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+        for bunny in self.bunnies:
+            if not bunny.is_mutant:
+                heatmap[bunny.x][bunny.y] += 1
+        return heatmap
 
 
     @property

@@ -30,7 +30,7 @@ def reward_func_female(bunny, grid):
     if bunny.age > bunny.max_age():
         reward -= 50  # death penalty
     if bunny.has_baby:
-           reward += 10  # Big bonus for successful birth
+           reward += 25  # Big bonus for successful birth
     
     if not bunny.has_baby:
         male_adj = any(
@@ -39,7 +39,7 @@ def reward_func_female(bunny, grid):
         )
         empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
         if male_adj and len(empty_tiles) > 0:
-            reward -= 1  # Small missed-opportunity penalty
+            reward -= 3  # Small missed-opportunity penalty
 
     return reward
     
@@ -57,6 +57,24 @@ def reward_func_male(bunny, grid):
     # Count adjacent females and vampires
     num_females = sum(1 for b in neighbors if b.sex == 'F' and b.is_adult() and not b.is_mutant)
     num_vampires = sum(1 for b in neighbors if b.is_mutant)
+    
+    adj_females = [
+    b for b in neighbors
+    if b.sex == 'F' and b.is_adult() and not b.is_mutant
+    ]
+
+    if adj_females:
+        reward += 10  # high reward for mating opportunity
+
+    # Encourage seeking fertile females nearby (not adjacent)
+    females_in_range = [
+        b for b in grid.bunnies
+        if b.sex == 'F' and b.is_adult() and not b.is_mutant
+        and abs(b.x - bunny.x) + abs(b.y - bunny.y) <= 3
+    ]
+
+    if females_in_range and not adj_females:
+        reward += 2  # small incentive for being near one
 
     if num_females > 0:
         reward += 2  # mating opportunity
@@ -145,6 +163,28 @@ def is_vampire_in_range(grid, x, y, radius=2):
                     return True
     return False
 
+def move_vampire_toward_cluster(bunny, grid):
+        heatmap = grid.get_bunny_density_map()
+        directions = grid.get_valid_moves(bunny)
+
+        best_score = -float("inf")
+        best_move = None
+
+        for dx, dy in directions:
+            nx, ny = bunny.x + dx, bunny.y + dy
+            if grid.in_bounds(nx, ny) and grid.is_empty(nx, ny):
+                score = sum(
+                    heatmap[x][y]
+                    for x in range(max(0, nx-2), min(grid.GRID_WIDTH, nx+3))
+                    for y in range(max(0, ny-2), min(grid.GRID_HEIGHT, ny+3))
+                )
+                if score > best_score:
+                    best_score = score
+                    best_move = (dx, dy)
+
+        if best_move:
+            bunny.move(best_move[0], best_move[1], grid)
+
 class FSMDispatcher:
     def __init__(self, mode="FSM"):
         self.mode = mode  # "FSM" or "RL"
@@ -159,8 +199,11 @@ class FSMDispatcher:
         # Load shared tables if they exist
         for btype in self.shared_tables:
             q = load_agent_qtable(f"{btype}_shared")
-            if q:
+            if isinstance(q, dict):  # make sure it's a Q-table, not corrupted
                 self.shared_tables[btype] = q
+            else:
+                print(f"[WARN] Shared table for '{btype}' is invalid or missing. Starting fresh.")
+
 
     def update_bunny(self, bunny, grid, turn, logger=None):
         # Determine bunny type and reward function — used in both FSM and RL
@@ -203,7 +246,9 @@ class FSMDispatcher:
             s_prime = agent.get_state(grid)
             r = reward_fn(bunny, grid)
             reward = reward_fn(bunny, grid)
-            agent.update_q(s, 5, r, s_prime)
+            #agent.update_q(s, 5, r, s_prime)
+            self.rl_agents[bunny.name].update_q(s, 5, r, s_prime)
+
         return reward
 
 
@@ -308,6 +353,8 @@ class FSMDispatcher:
             bunny.move_random(grid)
 
 
+    
+
     def vampire_behavior(self, bunny, grid, turn, logger):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
         victims = [b for b in neighbors if not b.is_mutant]
@@ -317,6 +364,7 @@ class FSMDispatcher:
             if logger:
                 logger.log(turn, "infection", bunny, f"infected {victim.name}")
         bunny.move_random(grid)
+        #move_vampire_toward_cluster(bunny, grid)
 
     def vampire_behavior_rl(self, bunny, grid, turn, logger):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
@@ -328,6 +376,7 @@ class FSMDispatcher:
             if logger:
                 logger.log(turn, "infection", bunny, f"infected {victim.name}")
             bunny.move_random(grid)
+            #move_vampire_toward_cluster(bunny, grid)
         else:
             if hasattr(grid, 'bunny_density_map'):
                 tx, ty = grid.bunny_density_map.best_tile()
@@ -336,6 +385,7 @@ class FSMDispatcher:
                     logger.log(turn, "hunt", bunny, f"moved toward density ({tx},{ty})")
             else:
                 bunny.move_random(grid)
+                #move_vampire_toward_cluster(bunny, grid)
 
     def move_away_from_threat(self, bunny, grid, threats):
         safe_dirs = []

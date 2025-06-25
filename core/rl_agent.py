@@ -1,15 +1,99 @@
 # core/rl_agent.py
 
-import random
-import pickle
 import os
+import pickle
+import random
+
+
+def merge_q_tables(old_q, new_q, alpha=0.5):
+    merged = old_q.copy()
+    for state, new_values in new_q.items():
+        if state in merged:
+            merged[state] = [
+                (1 - alpha) * old + alpha * new
+                for old, new in zip(merged[state], new_values)
+            ]
+        else:
+            merged[state] = new_values.copy()
+    return merged
+
 
 def save_all_agents(agent_dict, path="q_tables/", shared=False):
     os.makedirs(path, exist_ok=True)
-    for name, q_table in agent_dict.items():
-        filename = f"{name}_shared.pkl" if shared else f"{name}.pkl"
-        with open(os.path.join(path, filename), "wb") as f:
+
+    for name, agent in agent_dict.items():
+        q_table = agent.q_table
+
+        if shared:
+            bunny = getattr(agent, "bunny", None)
+            if bunny is None:
+                btype = "unknown"
+            elif bunny.is_mutant:
+                btype = "vampire"
+            elif not bunny.is_adult():
+                btype = "juvenile"
+            elif bunny.sex == "M":
+                btype = "male"
+            else:
+                btype = "female"
+
+            if name.startswith("J"):
+                btype = "juvenile"
+
+            filename = f"{btype}_shared.pkl"
+        else:
+            filename = f"{name}.pkl"
+
+        file_path = os.path.join(path, filename)
+
+        if shared and os.path.exists(file_path):
+            try:
+                with open(file_path, "rb") as f:
+                    existing_q = pickle.load(f)
+                q_table = merge_q_tables(existing_q, q_table, alpha=0.5)
+            except Exception as e:
+                print(f"[WARN] Could not merge shared Q-table for {filename}: {e}")
+
+        with open(file_path, "wb") as f:
             pickle.dump(q_table, f)
+            print(f"[SAVE] {name} as {btype} ({len(q_table)} states)")
+
+
+def save_combined_qtables(agent_dict, path="q_tables/all_shared.pkl"):
+    combined = {"male": {}, "female": {}, "juvenile": {}, "vampire": {}}
+
+    for agent in agent_dict.values():
+        q_table = agent.q_table
+        bunny = getattr(agent, "bunny", None)
+
+        if bunny is None:
+            continue
+        elif bunny.is_mutant:
+            role = "vampire"
+        elif not bunny.is_adult():
+            role = "juvenile"
+        elif bunny.sex == "M":
+            role = "male"
+        else:
+            role = "female"
+
+        if hasattr(agent, "last_state") and isinstance(agent.last_state, tuple):
+            if agent.last_state[0] == "juvenile":
+                role = "juvenile"
+
+        for state, values in q_table.items():
+            if state not in combined[role]:
+                combined[role][state] = values.copy()
+            else:
+                combined[role][state] = [
+                    (a + b) / 2.0 for a, b in zip(combined[role][state], values)
+                ]
+
+    with open(path, "wb") as f:
+        pickle.dump(combined, f)
+
+    print(f"[SAVE] Combined Q-tables saved to {path}")
+
 
 def load_agent_qtable(name, path="q_tables/"):
     file_path = f"{path}{name}.pkl"
@@ -26,7 +110,7 @@ class BunnyRLAgent:
     def __init__(self, bunny, shared_q_table):
         self.bunny = bunny
         self.q_table = shared_q_table
-        self.epsilon = 0.1
+        self.epsilon = 0.5
         self.alpha = 0.2
         self.gamma = 0.95
         self.last_state = None
@@ -98,6 +182,14 @@ class BunnyRLAgent:
                 self.flee_from_vampires(grid)
             elif self.bunny.sex == 'F':
                 self.birth(grid)
+            elif self.bunny.sex == 'M':
+                self.seek_female(grid)
+
+    def seek_female(self, grid):
+       
+        if grid.female_heatmap.best_tile_value() > 1.0:
+            tx, ty = grid.female_heatmap.best_tile()
+            grid.move_toward(self.bunny, tx, ty)
 
     def infect(self, grid):
         neighbors = grid.get_adjacent_bunnies(self.bunny.x, self.bunny.y)
@@ -140,3 +232,43 @@ class BunnyRLAgent:
             self.update_q(self.last_state, self.last_action, reward, state)
         self.last_state = state
         self.last_action = action
+
+        if self.last_state is not None and self.last_action is not None:
+            self.update_q(self.last_state, self.last_action, reward, state)
+        
+            # 🧠 Detect graduation from juvenile to adult
+            if self.last_state[0] == "juvenile" and state[0] in ("male", "female"):
+                print(f"[GRADUATED] {self.bunny.name} became {state[0]}")
+                self.save_juvenile_snapshot()
+
+    
+    def save_juvenile_snapshot(self, path="q_tables/juvenile_grads.pkl"):
+        if not isinstance(self.q_table, dict):
+            return
+        if len(self.q_table) == 0:
+            return
+
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    combined = pickle.load(f)
+            except:
+                combined = {}
+        else:
+            combined = {}
+
+        for state, values in self.q_table.items():
+            if state[0] != "juvenile":
+                continue
+            if state not in combined:
+                combined[state] = values.copy()
+            else:
+                combined[state] = [
+                    (a + b) / 2.0 for a, b in zip(combined[state], values)
+                ]
+
+        with open(path, "wb") as f:
+            pickle.dump(combined, f)
+        print(f"[SAVE] Juvenile snapshot saved with {len(combined)} states")
+
+

@@ -50,6 +50,14 @@ class Bunny:
             if logger:
                 logger.log(turn, "death", self, "natural causes", controller="FSM")
 
+    def move(self, dx, dy, grid):
+        """Move the bunny by (dx, dy) if the target cell is empty and in bounds."""
+        nx, ny = self.x + dx, self.y + dy
+        if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
+            grid.cells[self.x][self.y] = None
+            self.x, self.y = nx, ny
+            grid.cells[nx][ny] = self
+            
     def move_random(self, grid):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         random.shuffle(directions)
