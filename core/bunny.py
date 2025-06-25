@@ -20,28 +20,20 @@ class Bunny:
     def max_age(self):
         return 50 if self.is_mutant else 10
 
-    def make_baby(self, x, y, grid=None, turn=None):
+    def make_baby(self, x, y, grid=None):
         self.has_baby = True
+        grid.total_bunny_births += 1
         is_mutant = False
-    
-        if grid and turn is not None:
-            grid.total_bunny_births += 1
-            birth_rate = grid.total_vampire_births / grid.total_bunny_births if grid.total_bunny_births > 0 else 0
-    
-            allowed_to_mutate = (
-                turn >= 50 and
-                birth_rate < 0.02 and
-                (turn - grid.last_vampire_birth_turn) >= 50
-            )
-    
-            if allowed_to_mutate and random.random() < 0.02:
-                is_mutant = True
-                grid.total_vampire_births += 1
-                grid.last_vampire_birth_turn = turn
-        else:
-            # fallback (guarantees baby is born)
-            is_mutant = random.random() < 0.02
-    
+
+        current_mutant_ratio = (
+            grid.total_vampire_births / grid.total_bunny_births
+            if grid.total_bunny_births > 0 else 0
+        )
+
+        if current_mutant_ratio < 0.02 and random.random() < 0.02:
+            is_mutant = True
+            grid.total_vampire_births += 1        
+
         return Bunny(
             name=f"{self.name}_baby",
             sex=random.choice(['F', 'M']),
@@ -49,8 +41,6 @@ class Bunny:
             y=y,
             mutant=is_mutant
         )
-
-
     
     def update(self, grid, turn, logger=None):
         self.has_baby = False  # Clear after each turn
@@ -60,6 +50,14 @@ class Bunny:
             if logger:
                 logger.log(turn, "death", self, "natural causes", controller="FSM")
 
+    def move(self, dx, dy, grid):
+        """Move the bunny by (dx, dy) if the target cell is empty and in bounds."""
+        nx, ny = self.x + dx, self.y + dy
+        if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
+            grid.cells[self.x][self.y] = None
+            self.x, self.y = nx, ny
+            grid.cells[nx][ny] = self
+            
     def move_random(self, grid):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         random.shuffle(directions)
