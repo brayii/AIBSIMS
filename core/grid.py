@@ -23,6 +23,7 @@ class Grid:
         self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
         self.total_bunny_births = 0
         self.total_vampire_births = 0
+        self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)      
 
 
     def get_bunny_at(self, x, y):
@@ -36,7 +37,7 @@ class Grid:
 
     
     def is_empty(self, x, y):
-        return self.in_bounds(x, y) and self.get_bunny_at(x, y) is None
+        return self.in_bounds(x, y) and self.cells[x][y] is None
 
     def get_valid_moves(self, bunny):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, down, left, right
@@ -49,27 +50,19 @@ class Grid:
 
         return valid_moves
 
-    def nearest_vampire_distance(self, x, y):
+    def nearest_vampire_distance(self, x, y, radius=5):
         """Return the Manhattan distance to the nearest vampire from (x, y), or None if none found."""
         min_dist = None
-        for bx in range(self.GRID_WIDTH):
-            for by in range(self.GRID_HEIGHT):
-                bunny = self.cells[bx][by]
-                if bunny is not None and getattr(bunny, "is_mutant", False):
-                    dist = abs(bx - x) + abs(by - y)
-                    if min_dist is None or dist < min_dist:
-                        min_dist = dist
+        for b in self.bunnies:
+            if b.is_mutant:
+                d = abs(b.x - x) + abs(b.y - y)
+                if d <= radius:
+                    if min_dist is None or d < min_dist:
+                        min_dist = d
         return min_dist
     
     def is_vampire_in_range(self, x, y, radius=3):
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                nx, ny = x + dx, y + dy
-                if self.in_bounds(nx, ny):
-                    bunny = self.cells[nx][ny]
-                    if bunny and bunny.is_mutant:
-                        return True
-        return False
+        return self.nearest_vampire_distance(x, y, radius) is not None
 
     def get_adjacent_offsets(self):
         return [
@@ -81,7 +74,7 @@ class Grid:
     
     def in_bounds(self, x, y):
         """Return True if (x, y) is within the grid bounds."""
-        return 0 <= x < self.GRID_WIDTH and 0 <= y < self.GRID_HEIGHT
+        return 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT
 
 
     def spawn_initial_bunnies(self):
@@ -94,64 +87,62 @@ class Grid:
             self.place_bunny(b1, x, y)
             self.place_bunny(b2, x+1, y=y)
 
-
         # Optional: Add 1 juvenile for mutation testing
         jx, jy = random.randint(0, self.GRID_WIDTH - 1), random.randint(0, self.GRID_HEIGHT - 1)
         if self.cells[jx][jy] is None:
             juvenile = Bunny(name="J100", sex=random.choice(['M', 'F']), x=jx, y=jy, age=0)
             self.place_bunny(juvenile, jx, jy)
 
-
     def place_bunny(self, bunny, x, y):
-        bunny.x, bunny.y = x, y
-        self.bunnies.append(bunny)
-        self.cells[x][y] = bunny
-
-    def move_bunny(self, bunny, new_x, new_y):
-        self.cells[bunny.x][bunny.y] = None
-        bunny.x, bunny.y = new_x, new_y
-        self.cells[new_x][new_y] = bunny
-
-    def add_bunny(self, bunny):
-        if self.in_bounds(bunny.x, bunny.y) and self.cells[bunny.x][bunny.y] is None:
-            self.cells[bunny.x][bunny.y] = bunny
+        if self.is_empty(x, y):
+            self.cells[x][y] = bunny
+            bunny.x = x
+            bunny.y = y
             self.bunnies.append(bunny)
 
-    def remove_bunny(self, bunny):
-        if self.cells[bunny.x][bunny.y] == bunny:
+    def move_bunny(self, bunny, new_x, new_y):
+        if self.in_bounds(new_x, new_y) and self.cells[new_x][new_y] is None:
             self.cells[bunny.x][bunny.y] = None
+            bunny.x, bunny.y = new_x, new_y
+            self.cells[new_x][new_y] = bunny
+
+    #def add_bunny(self, bunny):
+    #    if self.in_bounds(bunny.x, bunny.y) and self.cells[bunny.x][bunny.y] is None:
+    #        self.cells[bunny.x][bunny.y] = bunny
+    #        self.bunnies.append(bunny)
+
+    def remove_bunny(self, bunny):
+        self.cells[bunny.x][bunny.y] = None
         if bunny in self.bunnies:
             self.bunnies.remove(bunny)
 
     def get_adjacent_empty_tiles(self, x, y):
-        directions = [(-1,0), (1,0), (0,-1), (0,1)]
-        return [
-            (nx, ny)
-            for dx, dy in directions
-            if 0 <= (nx := x + dx) < GRID_WIDTH and 0 <= (ny := y + dy) < GRID_HEIGHT
-            and self.cells[nx][ny] is None
-        ]
-
-    def find_adjacent_entities(self, x, y):
-        adjacent = []
-        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+        empty = []
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nx, ny = x + dx, y + dy
-            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                entity = self.cells[nx][ny]
-                if entity:
-                    adjacent.append(entity)
-        return adjacent
+            if self.is_empty(nx, ny):
+                empty.append((nx, ny))
+        return empty
+
+    #def find_adjacent_entities(self, x, y):
+    #    adjacent = []
+    #    for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+    #        nx, ny = x + dx, y + dy
+    #        if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+    #            entity = self.cells[nx][ny]
+    #            if entity:
+    #                adjacent.append(entity)
+    #    return adjacent
     
     def get_adjacent_bunnies(self, x, y):
         """Return a list of bunnies adjacent (N, S, E, W) to (x, y)."""
         neighbors = []
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dx, dy in directions:
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nx, ny = x + dx, y + dy
-            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                bunny = self.cells[nx][ny]
-                if bunny is not None:
-                    neighbors.append(bunny)
+            if self.in_bounds(nx, ny):
+                b = self.cells[nx][ny]
+                if b:
+                    neighbors.append(b)
         return neighbors
     
     def move_toward(self, bunny, tx, ty):
@@ -177,13 +168,20 @@ class Grid:
             bunny.draw(self.screen, px, py)
 
     def update(self):
+        """Update the grid display."""
+        # Clear the screen
         self.screen.fill(BG_COLOR)
+        for bunny in self.bunnies:
+            px = bunny.x * TILE_SIZE
+            py = bunny.y * TILE_SIZE
+            bunny.draw(self.screen, px, py)
+        
         self.draw_grid()
         self.draw_entities()
         pygame.display.flip()
     
-    def get_all_bunnies(self):
-        return list(self.bunnies)
+    #def get_all_bunnies(self):
+    #    return list(self.bunnies)
 
     def get_bunny_density_map(self):
         heatmap = [[0 for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]

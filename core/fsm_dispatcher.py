@@ -32,15 +32,11 @@ def reward_func_female(bunny, grid):
     if bunny.has_baby:
            reward += 25  # Big bonus for successful birth
     
-    if not bunny.has_baby:
-        male_adj = any(
-            b.sex == 'M' and b.is_adult() and not b.is_mutant
-            for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        )
-        empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
-        if male_adj and len(empty_tiles) > 0:
-            reward -= 3  # Small missed-opportunity penalty
-
+    if bunny.has_baby:
+        reward += 25  # Big bonus for successful birth
+    elif num_males > 0 and len(empty_tiles) > 0:
+        reward -= 3  # Small missed-opportunity penalty 
+    
     return reward
     
 
@@ -49,110 +45,71 @@ def reward_func_male(bunny, grid):
     if not bunny.is_adult() or bunny.sex != 'M':
         return 0  # Only applies to adult males
 
-    reward = 1  # Survived a turn
+    reward = 1  # Survived a turn       
+    
 
     neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
     empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
+    females = [b for b in neighbors if b.sex == 'F' and b.is_adult() and not b.is_mutant]
+    vampires = [b for b in neighbors if b.is_mutant]
 
-    # Count adjacent females and vampires
-    num_females = sum(1 for b in neighbors if b.sex == 'F' and b.is_adult() and not b.is_mutant)
-    num_vampires = sum(1 for b in neighbors if b.is_mutant)
-    
-    adj_females = [
-    b for b in neighbors
-    if b.sex == 'F' and b.is_adult() and not b.is_mutant
-    ]
+    if females:
+        reward += 10 # Found a female
+    elif any(b.sex == 'F' and b.is_adult() for b in grid.bunnies if abs(b.x - bunny.x) + abs(b.y - bunny.y) <= 3):
+        reward += 2 # Small incentive for being near a female
 
-    if adj_females:
-        reward += 10  # high reward for mating opportunity
-
-    # Encourage seeking fertile females nearby (not adjacent)
-    females_in_range = [
-        b for b in grid.bunnies
-        if b.sex == 'F' and b.is_adult() and not b.is_mutant
-        and abs(b.x - bunny.x) + abs(b.y - bunny.y) <= 3
-    ]
-
-    if females_in_range and not adj_females:
-        reward += 2  # small incentive for being near one
-
-    if num_females > 0:
-        reward += 2  # mating opportunity
-
-    if num_vampires > 0:
-        reward -= 20  # danger zone
-
-    # Check if breeding occurred (female nearby gave birth)
+    if vampires:
+        reward -= 20    # Dangerous neighborhood
     if any(b.sex == 'F' and b.has_baby for b in neighbors):
-        reward += 10  # successful mating
+        reward += 10  # Found a female with a baby
 
-    # Bonus for standing in favorable heatmap zone
-    if hasattr(grid, 'female_heatmap'):
-        try:
-            if grid.female_heatmap.data[bunny.x][bunny.y] > 1.0:
-                reward += 2
-        except IndexError as e:
-            print(f"[WARN] Heatmap out-of-bounds for bunny {bunny.name} at ({bunny.x},{bunny.y}): {e}")
+    if hasattr(grid, 'female_heatmap') and grid.female_heatmap.data[bunny.x][bunny.y] > 1.0:
+        reward += 2  # Standing in a favorable heatmap zone
 
-
-    # Additional penalty for being too close to mutants
-    #if any(b.is_mutant for b in neighbors):
-    #    reward -= 10  # close-range threat
-
-    # Penalty if male could have bred but didn’t
-    can_breed = num_females > 0 and len(empty_tiles) > 0
-    if can_breed and not any(b.sex == 'F' and b.has_baby for b in neighbors):
-        reward -= 1
+    if females and empty_tiles and not any(b.has_baby for b in females):
+        reward -= 1  # Small missed-opportunity penalty
 
     if bunny.age > bunny.max_age():
-        reward -= 50  # death penalty
+        reward -= 50  # Death penalty
 
     return reward
 
 def reward_func_vampire(bunny, grid):
-    if not bunny.is_adult() or not bunny.is_mutant:
+    if not bunny.is_adult or not bunny.is_mutant:
         return 0
 
-    reward = 1  # survived a turn
-
+    reward = 1
     neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
     victims = [b for b in neighbors if not b.is_mutant]
 
     if victims:
-        reward += 10  # successful infection
-
-    if not victims:
-        reward -= 1  # wandering without prey
+        reward += 10 # Successfully infected a bunny
+    else:
+        reward -= 1  # Wandering without prey
 
     if sum(1 for b in neighbors if b.is_mutant) > 1:
-        reward -= 2  # overcrowding
-
+        reward -= 2  # Overcrowding penalty
     if bunny.age > bunny.max_age():
-        reward -= 50
+        reward -= 50  # Death penalty
 
     return reward
 
 def reward_func_juvenile(bunny, grid):
-    if bunny.adult or bunny.is_mutant:
+    if bunny.is_adult or bunny.is_mutant:
         return 0
 
-    reward = 1  # survived a turn
-
-    # Becomes adult = goal reached
+    reward = 1
     if bunny.age >= 2:
-        reward += 10
-
-    # Vampire adjacent = dangerous
-    neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-    if any(b.is_mutant for b in neighbors):
-        reward -= 10
+        reward += 10 # Grown into adult
+    if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
+        reward -= 10 # Mutated into vampire
 
     return reward
 
-def vampire_nearby(bunny, grid):
-        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        return any(b.is_mutant for b in neighbors)
-
+#def vampire_nearby(bunny, grid):
+#        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
+#        return any(b.is_mutant for b in neighbors)
+#
 def is_vampire_in_range(grid, x, y, radius=2):
     for dx in range(-radius, radius + 1):
         for dy in range(-radius, radius + 1):
@@ -162,47 +119,34 @@ def is_vampire_in_range(grid, x, y, radius=2):
                 if b and b.is_mutant:
                     return True
     return False
-
-def move_vampire_toward_cluster(bunny, grid):
-        heatmap = grid.get_bunny_density_map()
-        directions = grid.get_valid_moves(bunny)
-
-        best_score = -float("inf")
-        best_move = None
-
-        for dx, dy in directions:
-            nx, ny = bunny.x + dx, bunny.y + dy
-            if grid.in_bounds(nx, ny) and grid.is_empty(nx, ny):
-                score = sum(
-                    heatmap[x][y]
-                    for x in range(max(0, nx-2), min(grid.GRID_WIDTH, nx+3))
-                    for y in range(max(0, ny-2), min(grid.GRID_HEIGHT, ny+3))
-                )
-                if score > best_score:
-                    best_score = score
-                    best_move = (dx, dy)
-
-        if best_move:
-            bunny.move(best_move[0], best_move[1], grid)
+#
+#def move_vampire_toward_cluster(bunny, grid):
+#        heatmap = grid.get_bunny_density_map()
+#        directions = grid.get_valid_moves(bunny)
+#
+#        best_score = -float("inf")
+#        best_move = None
+#
+#        for dx, dy in directions:
+#            nx, ny = bunny.x + dx, bunny.y + dy
+#            if grid.in_bounds(nx, ny) and grid.is_empty(nx, ny):
+#                score = sum(
+#                    heatmap[x][y]
+#                    for x in range(max(0, nx-2), min(grid.GRID_WIDTH, nx+3))
+#                    for y in range(max(0, ny-2), min(grid.GRID_HEIGHT, ny+3))
+#                )
+#                if score > best_score:
+#                    best_score = score
+#                    best_move = (dx, dy)
+#
+#        if best_move:
+#            bunny.move(best_move[0], best_move[1], grid)
 
 class FSMDispatcher:
     def __init__(self, mode="FSM"):
-        self.mode = mode  # "FSM" or "RL"
+        self.mode = mode
         self.rl_agents = {}
-        self.shared_tables = {
-            'male': {},
-            'female': {},
-            'juvenile': {},
-            'vampire': {},
-        }
-
-        # Load shared tables if they exist
-        for btype in self.shared_tables:
-            q = load_agent_qtable(f"{btype}_shared")
-            if isinstance(q, dict):  # make sure it's a Q-table, not corrupted
-                self.shared_tables[btype] = q
-            else:
-                print(f"[WARN] Shared table for '{btype}' is invalid or missing. Starting fresh.")
+        self.shared_tables = {k: load_agent_qtable(f"{k}_shared") or {} for k in ['male', 'female', 'juvenile', 'vampire']}
 
 
     def update_bunny(self, bunny, grid, turn, logger=None):
@@ -210,7 +154,7 @@ class FSMDispatcher:
         if bunny.is_mutant:
             btype = 'vampire'
             reward_fn = reward_func_vampire
-        elif not bunny.is_adult():
+        elif not bunny.is_adult:
             btype = 'juvenile'
             reward_fn = reward_func_juvenile
         elif bunny.sex == "M":
@@ -225,14 +169,30 @@ class FSMDispatcher:
             self.rl_agents[bunny.name] = BunnyRLAgent(bunny, self.shared_tables[btype])
         agent = self.rl_agents[bunny.name]
 
+
         if self.mode == "RL":
             agent.step(grid, turn, logger, reward_fn)
             reward = reward_fn(bunny, grid)  # you could capture this inside step() as well
+        #else:
+        #    s = agent.get_state(grid)
+        #    if btype == 'vampire':
+        #        agent.infect(grid)
+        #    elif btype == 'juvenile':
+        #        agent.flee_from_vampires(grid)
+        #    elif btype == 'male':
+        #        agent.seek_female(grid)
+        #    elif btype == 'female':
+        #        agent.birth(grid)
+#
+        #    s_prime = agent.get_state(grid)
+        #    reward = reward_fn(bunny, grid)
+        #    agent.update_q(s, 5, reward, s_prime)
+#
+        #return reward_fn(bunny, grid)
         else:
             # FSM Mode — still collect RL experience
             s = agent.get_state(grid)
-
-            # FSM behavior execution
+#            # FSM behavior execution
             if bunny.is_mutant:
                 self.vampire_behavior(bunny, grid, turn, logger)
             elif not bunny.is_adult():
@@ -241,116 +201,111 @@ class FSMDispatcher:
                 self.adult_male_behavior(bunny, grid, turn, logger)
             else:
                 self.adult_female_behavior(bunny, grid, turn, logger)
-
-            # Update Q-table based on FSM decision as if action 5 was taken
-            s_prime = agent.get_state(grid)
-            r = reward_fn(bunny, grid)
+#            # Update Q-table based on FSM decision as if action 5 was taken
+            s_prime = agent.get_state(grid)            
             reward = reward_fn(bunny, grid)
-            #agent.update_q(s, 5, r, s_prime)
-            self.rl_agents[bunny.name].update_q(s, 5, r, s_prime)
+            agent.update_q(s, 5, reward, s_prime)
+            
 
         return reward
 
 
 
     def juvenile_behavior(self, bunny, grid, turn, logger):
-        # Mutate if adjacent to vampire
-        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        if any(b.is_mutant for b in neighbors):
+        
+        if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
             bunny.is_mutant = True
             if logger:
                 logger.log(turn, "mutation", bunny, "converted to vampire")
             return
 
-        # Grow into adult
         if bunny.age >= 2:
             bunny.adult = True
             if logger:
                 logger.log(turn, "adult", bunny, "became adult")
 
-        # Flee if vampire in range
         if is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
             safe_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
-            best_tile = None
-            max_dist = -1
-            for (tx, ty) in safe_tiles:
-                dist = grid.nearest_vampire_distance(tx, ty)
-                if dist is not None and dist > max_dist:
-                    best_tile = (tx, ty)
-                    max_dist = dist
-            if best_tile:
-                grid.move_bunny(bunny, *best_tile)
+            best = max(safe_tiles, key=lambda t: grid.nearest_vampire_distance(*t) or -1, default=None)
+            if best:
+                grid.move_bunny(bunny, *best)
                 if logger:
-                    logger.log(turn, "flee", bunny, f"fled to ({best_tile[0]},{best_tile[1]})")
+                    logger.log(turn, "flee", bunny, f"fled to {best}")
             else:
                 bunny.move_random(grid)
         else:
             bunny.move_random(grid)
 
 
-    def adult_female_behavior(self, bunny, grid, turn, logger):  
+
+    def adult_female_behavior(self, bunny, grid, turn, logger):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        vampires = [b for b in neighbors if b.is_mutant]
         babies = [b for b in neighbors if b.age < 2 and not b.is_mutant]
-        males = [b for b in neighbors if b.sex == 'M' and b.is_adult() and not b.is_mutant]
+        vampires = [b for b in neighbors if b.is_mutant]
+        males = [b for b in neighbors if b.sex == 'M' and b.is_adult and not b.is_mutant]
         empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
 
         if vampires and babies:
-            bunny.state = "PROTECT"
+            state = "PROTECT"
         elif vampires:
-            bunny.state = "FLEE_VAMPIRE"
+            state = "FLEE_VAMPIRE"
         elif males and empty_tiles:
-            bunny.state = "BREED"
+            state = "BREED"
         elif males:
-            bunny.state = "SEEK_MATE"
+            state = "SEEK_MATE"
         else:
-            bunny.state = "IDLE"  # No action needed
-        
-        
-        if logger:
-            logger.log(turn, "state", bunny, f"FSM: {bunny.state}")
+            state = "IDLE"
 
-        if bunny.state == "PROTECT":
-            pass  # future: move into line-of-sight between vampire and baby
-        elif bunny.state == "FLEE_VAMPIRE":
+        if bunny.state != state:
+            bunny.state = state
+            if logger:
+                logger.log(turn, "state", bunny, f"FSM: {state}")
+
+        if state == "PROTECT":
+            self.move_away_from_threat(bunny, grid, vampires)  # Simple block
+        elif state == "FLEE_VAMPIRE":
             self.move_away_from_threat(bunny, grid, vampires)
             if logger:
                 logger.log(turn, "flee", bunny, "escaped vampire")
-        elif bunny.state == "SEEK_MATE":
+        elif state == "SEEK_MATE":
             grid.move_toward(bunny, males[0].x, males[0].y)
-        elif bunny.state == "BREED":
-            nx, ny = random.choice(empty_tiles)
-            baby = bunny.make_baby(nx, ny, grid=grid)
-            grid.place_bunny(baby, nx, ny)
-            if logger:
-                logger.log(turn, "birth", baby, f"by {bunny.name}")
+        elif state == "BREED":
+            if empty_tiles:
+                nx, ny = random.choice(empty_tiles)
+                baby = bunny.make_baby(nx, ny, grid=grid)
+                grid.place_bunny(baby, nx, ny)
+                if logger:
+                    logger.log(turn, "birth", baby, f"by {bunny.name}")
         else:
             bunny.move_random(grid)
 
 
-    def adult_male_behavior(self, bunny, grid, turn, logger):   
+
+    def adult_male_behavior(self, bunny, grid, turn, logger):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        females = [b for b in neighbors if b.sex == 'F' and b.is_adult() and not b.is_mutant]
+        females = [b for b in neighbors if b.sex == 'F' and b.is_adult and not b.is_mutant]
+        has_heat_target = grid.female_heatmap and grid.female_heatmap.best_tile_value() > 1.0
 
         if females:
-            bunny.state = "WAIT_NEAR_FEMALE"
-        elif grid.female_heatmap.best_tile_value() > 1.0:
-            bunny.state = "SEEK_MATE_ZONE"
+            state = "WAIT_NEAR_FEMALE"
+        elif has_heat_target:
+            state = "SEEK_MATE_ZONE"
         else:
-            bunny.state = "WANDER"
+            state = "WANDER"
 
-        if logger:
-            logger.log(turn, "state", bunny, f"FSM: {bunny.state}")
+        if bunny.state != state:
+            bunny.state = state
+            if logger:
+                logger.log(turn, "state", bunny, f"FSM: {state}")
 
-        if bunny.state == "WAIT_NEAR_FEMALE":
-            pass
-        elif bunny.state == "SEEK_MATE_ZONE":
+        if state == "SEEK_MATE_ZONE":
             tx, ty = grid.female_heatmap.best_tile()
             grid.move_toward(bunny, tx, ty)
             if logger:
-                logger.log(turn, "seeking_fertile", bunny, f"moving toward ({tx},{ty})")
-        else:
+                logger.log(turn, "seek", bunny, f"moving toward ({tx},{ty})")
+        elif state == "WANDER":
             bunny.move_random(grid)
+
 
 
     
@@ -358,34 +313,50 @@ class FSMDispatcher:
     def vampire_behavior(self, bunny, grid, turn, logger):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
         victims = [b for b in neighbors if not b.is_mutant]
-        if victims:
-            victim = random.choice(victims)
-            victim.is_mutant = True
-            if logger:
-                logger.log(turn, "infection", bunny, f"infected {victim.name}")
-        bunny.move_random(grid)
-        #move_vampire_toward_cluster(bunny, grid)
-
-    def vampire_behavior_rl(self, bunny, grid, turn, logger):
-        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-        victims = [b for b in neighbors if not b.is_mutant]
 
         if victims:
             victim = random.choice(victims)
             victim.is_mutant = True
             if logger:
                 logger.log(turn, "infection", bunny, f"infected {victim.name}")
-            bunny.move_random(grid)
-            #move_vampire_toward_cluster(bunny, grid)
         else:
-            if hasattr(grid, 'bunny_density_map'):
-                tx, ty = grid.bunny_density_map.best_tile()
-                grid.move_toward(bunny, tx, ty)
-                if logger:
-                    logger.log(turn, "hunt", bunny, f"moved toward density ({tx},{ty})")
+            heatmap = grid.get_bunny_density_map()
+            best = None
+            best_score = -1
+            for dx, dy in grid.get_valid_moves(bunny):
+                nx, ny = bunny.x + dx, bunny.y + dy
+                score = sum(heatmap[i][j]
+                            for i in range(max(0, nx - 2), min(grid.GRID_WIDTH, nx + 3))
+                            for j in range(max(0, ny - 2), min(grid.GRID_HEIGHT, ny + 3)))
+                if score > best_score:
+                    best_score = score
+                    best = (nx, ny)
+            if best:
+                grid.move_bunny(bunny, *best)
             else:
                 bunny.move_random(grid)
-                #move_vampire_toward_cluster(bunny, grid)
+
+
+    #def vampire_behavior_rl(self, bunny, grid, turn, logger):
+    #    neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
+    #    victims = [b for b in neighbors if not b.is_mutant]
+#
+    #    if victims:
+    #        victim = random.choice(victims)
+    #        victim.is_mutant = True
+    #        if logger:
+    #            logger.log(turn, "infection", bunny, f"infected {victim.name}")
+    #        bunny.move_random(grid)
+    #        #move_vampire_toward_cluster(bunny, grid)
+    #    else:
+    #        if hasattr(grid, 'bunny_density_map'):
+    #            tx, ty = grid.bunny_density_map.best_tile()
+    #            grid.move_toward(bunny, tx, ty)
+    #            if logger:
+    #                logger.log(turn, "hunt", bunny, f"moved toward density ({tx},{ty})")
+    #        else:
+    #            bunny.move_random(grid)
+    #            #move_vampire_toward_cluster(bunny, grid)
 
     def move_away_from_threat(self, bunny, grid, threats):
         safe_dirs = []
