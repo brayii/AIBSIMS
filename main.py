@@ -13,7 +13,7 @@ def main():
     pygame.display.set_caption("Bunny Simulator")
 
     grid = Grid(screen)
-    dispatcher = FSMDispatcher()
+    dispatcher = FSMDispatcher(mode="RL")  # FSM or RL
     #logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
@@ -21,8 +21,6 @@ def main():
 
     turn = 0
     max_population = 0
-    total_reward = 0
-    reward_history = []
 
     running = True
     while running:
@@ -35,27 +33,24 @@ def main():
 
         # Simulation step every 500ms
         if turn == 0 or pygame.time.get_ticks() % 500 < 20:
-            turn += 1
-            turn_reward = 0
+            turn += 1            
                     
             # Update heatmap before agent logic
-            grid.female_heatmap.decay()
-            grid.female_heatmap.update_from_sightings(grid.get_all_bunnies())
+            if grid.female_heatmap:
+                grid.female_heatmap.decay()
+                grid.female_heatmap.update_from_sightings(grid.bunnies)
 
             total_reward = 0
             bunnies = list(grid.bunnies)  # avoid mutation during loop
             for bunny in bunnies:
-                #bunny.update(grid, turn, logger)
-                bunny.update(grid, turn, None)
-                #dispatcher.update_bunny(bunny, grid, turn, logger)
-                reward = dispatcher.update_bunny(bunny, grid, turn, None)
-                total_reward += reward    
+                bunny.update(grid, turn)
+                total_reward += dispatcher.update_bunny(bunny, grid, turn)  
 
             avg_reward = total_reward / len(grid.bunnies) if grid.bunnies else 0
     
                 
             # Check for extinction
-            if len(grid.bunnies) == 0:
+            if not grid.bunnies:
                 print(f"Simulation ended at turn {turn} — all bunnies are gone.")
                 running = False
                 break
@@ -64,21 +59,20 @@ def main():
             grid.update()
 
             # --- HUD Metrics ---
-            total = len(grid.bunnies)
-            adults = sum(1 for b in grid.bunnies if b.is_adult())
+            adults = sum(1 for b in grid.bunnies if b.is_adult)
             mutants = sum(1 for b in grid.bunnies if b.is_mutant)
             max_population = max(max_population, len(grid.bunnies))
             fps_display = f"{fps:.1f}" if fps > 1.0 else "--"
 
-            hud_lines = [
+            hud = [
                 f"Turn: {turn}",
                 f"FPS: {fps_display}",
-                f"Bunnies: {total} (Adults: {adults}, Mutants: {mutants})",
+                f"Bunnies: {len(grid.bunnies)} (Adults: {adults}, Mutants: {mutants})",
                 f"Max Population: {max_population}",
                 f"Avg Reward: {avg_reward:.2f}",
             ]
 
-            for i, line in enumerate(hud_lines):
+            for i, line in enumerate(hud):
                 text = font.render(line, True, (255, 255, 255))
                 screen.blit(text, (10, 10 + i * 20))
 
@@ -88,10 +82,13 @@ def main():
     
     pygame.quit()
     
-    bunnies_trained_population = 100  # Example threshold for trained bunnies
-    if max_population >= bunnies_trained_population:
-        save_all_agents(dispatcher.rl_agents,shared=True)
+    save_all_agents(dispatcher.rl_agents, shared=True)
     print("[INFO] RL agents saved.")
+    #bunnies_trained_population = 15  # Example threshold for trained bunnies
+    #if max_population >= bunnies_trained_population:
+    #    save_all_agents(dispatcher.rl_agents, shared=True)
+    #    print("[INFO] RL agents saved.")
+
 
 
 if __name__ == "__main__":
