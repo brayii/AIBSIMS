@@ -37,6 +37,9 @@ def reward_func_female(bunny, grid):
     elif num_males > 0 and len(empty_tiles) > 0:
         reward -= 3  # Small missed-opportunity penalty 
     
+    colony_reward = grid.colony_rewards["population_bonus"] + grid.colony_rewards["vampire_free_bonus"]
+    reward += 0.1 * colony_reward  # scaled contribution
+    
     return reward
     
 
@@ -164,6 +167,7 @@ class FSMDispatcher:
             btype = 'female'
             reward_fn = reward_func_female
 
+        role = btype
         # Ensure agent exists (used even in FSM mode for training)
         if bunny.name not in self.rl_agents:
             self.rl_agents[bunny.name] = BunnyRLAgent(bunny, self.shared_tables[btype])
@@ -172,7 +176,7 @@ class FSMDispatcher:
 
         if self.mode == "RL":
             agent.step(grid, turn, logger, reward_fn)
-            reward = reward_fn(bunny, grid)  # you could capture this inside step() as well
+            return reward_fn(bunny, grid), role  # you could capture this inside step() as well
         #else:
         #    s = agent.get_state(grid)
         #    if btype == 'vampire':
@@ -205,9 +209,11 @@ class FSMDispatcher:
             s_prime = agent.get_state(grid)            
             reward = reward_fn(bunny, grid)
             agent.update_q(s, 5, reward, s_prime)
-            
+            return reward, role
+        
+        return 0, None  # Default case, shouldn't happen
 
-        return reward
+                
 
 
 
