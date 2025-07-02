@@ -18,12 +18,21 @@ class Grid:
     def __init__(self, screen):
         self.screen = screen
         self.bunnies = []
+        self.bunny_map = {}
         self.cells = [[None for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
         self.spawn_initial_bunnies()
         self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
         self.total_bunny_births = 0
         self.total_vampire_births = 0
-        self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)      
+        self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
+
+        self.colony_rewards = {
+            "population_bonus": 0,
+            "vampire_free_bonus": 0,
+        }
+        self.last_vampire_turn = 0
+
+              
 
 
     def get_bunny_at(self, x, y):
@@ -95,16 +104,19 @@ class Grid:
 
     def place_bunny(self, bunny, x, y):
         if self.is_empty(x, y):
-            self.cells[x][y] = bunny
-            bunny.x = x
-            bunny.y = y
             self.bunnies.append(bunny)
+            self.cells[x][y] = bunny
+            self.bunny_map[(x, y)] = bunny
+
 
     def move_bunny(self, bunny, new_x, new_y):
         if self.in_bounds(new_x, new_y) and self.cells[new_x][new_y] is None:
             self.cells[bunny.x][bunny.y] = None
-            bunny.x, bunny.y = new_x, new_y
+            self.bunny_map.pop((bunny.x, bunny.y), None)
             self.cells[new_x][new_y] = bunny
+            self.bunny_map[(new_x, new_y)] = bunny
+            bunny.x, bunny.y = new_x, new_y
+
 
     #def add_bunny(self, bunny):
     #    if self.in_bounds(bunny.x, bunny.y) and self.cells[bunny.x][bunny.y] is None:
@@ -112,9 +124,12 @@ class Grid:
     #        self.bunnies.append(bunny)
 
     def remove_bunny(self, bunny):
-        self.cells[bunny.x][bunny.y] = None
+        """Remove a bunny from the grid.""" 
         if bunny in self.bunnies:
+            self.cells[bunny.x][bunny.y] = None
             self.bunnies.remove(bunny)
+            self.bunny_map.pop((bunny.x, bunny.y), None)
+
 
     def get_adjacent_empty_tiles(self, x, y):
         empty = []
@@ -135,15 +150,16 @@ class Grid:
     #    return adjacent
     
     def get_adjacent_bunnies(self, x, y):
-        """Return a list of bunnies adjacent (N, S, E, W) to (x, y)."""
-        neighbors = []
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        """Return a list of bunnies adjacent to (x, y).""" 
+        adjacent = []
+        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
             nx, ny = x + dx, y + dy
             if self.in_bounds(nx, ny):
-                b = self.cells[nx][ny]
-                if b:
-                    neighbors.append(b)
-        return neighbors
+                bunny = self.bunny_map.get((nx, ny))
+                if bunny:
+                    adjacent.append(bunny)
+        return adjacent
+
     
     def move_toward(self, bunny, tx, ty):
         dx = 1 if tx > bunny.x else -1 if tx < bunny.x else 0
@@ -175,6 +191,24 @@ class Grid:
             px = bunny.x * TILE_SIZE
             py = bunny.y * TILE_SIZE
             bunny.draw(self.screen, px, py)
+        
+        # track colony bonuses
+        population_size = len(self.bunnies)
+
+        # bonus if colony grows past 200
+        if population_size >= 20:
+            self.colony_rewards["population_bonus"] = 50
+        elif population_size <= 15:
+            self.colony_rewards["population_bonus"] = -100
+        else:
+            self.colony_rewards["population_bonus"] = 0
+
+        # vampire-free bonus
+        if self.total_vampire_births == 0:
+            self.colony_rewards["vampire_free_bonus"] += 1  # +1 per vampire-free turn
+        else:
+            self.colony_rewards["vampire_free_bonus"] = 0
+
         
         self.draw_grid()
         self.draw_entities()
