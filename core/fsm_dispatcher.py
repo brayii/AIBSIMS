@@ -18,27 +18,43 @@ def reward_func_female(bunny, grid):
     num_males = sum(1 for b in neighbors if b.sex == 'M' and b.is_adult() and not b.is_mutant)
     num_vampires = sum(1 for b in neighbors if b.is_mutant)
 
+    bunny_population = len(grid.bunnies)
+
+    if bunny_population >= 10:
+        reward += 15  # colony is thriving
+    elif bunny_population >= 20:
+        reward += 30 # colony is doing well
+    elif bunny_population >= 30:
+        reward += 50 # colony is healthy
+    elif bunny_population >= 50: 
+        reward += 100 # colony is strong
+    elif bunny_population >= 100:
+        reward += 200   # colony is very strong
+    else:
+        reward -= 15  # colony is struggling
+
     if num_males > 0:
         reward += 2  # mating opportunity
 
     if len(empty_tiles) == 0:
         reward -= 5  # no space to breed
 
-    if num_vampires > 0:
-        reward -= 20  # dangerous neighborhood
+    if num_vampires > 0 or is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
+        reward -= 10 # Near vampires
+    else:
+        reward += 5
+        #reward -= 20  # dangerous neighborhood
 
     if bunny.age > bunny.max_age():
         reward -= 50  # death penalty
-    if bunny.has_baby:
-           reward += 25  # Big bonus for successful birth
-    
+        
     if bunny.has_baby:
         reward += 25  # Big bonus for successful birth
     elif num_males > 0 and len(empty_tiles) > 0:
         reward -= 3  # Small missed-opportunity penalty 
     
-    colony_reward = grid.colony_rewards["population_bonus"] + grid.colony_rewards["vampire_free_bonus"]
-    reward += 0.1 * colony_reward  # scaled contribution
+    #colony_reward = grid.colony_rewards["population_bonus"] + grid.colony_rewards["vampire_free_bonus"]
+    #reward += 0.1 * colony_reward  # scaled contribution
     
     return reward
     
@@ -55,13 +71,13 @@ def reward_func_male(bunny, grid):
     empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
     females = [b for b in neighbors if b.sex == 'F' and b.is_adult() and not b.is_mutant]
     vampires = [b for b in neighbors if b.is_mutant]
-
+    
     if females:
         reward += 10 # Found a female
-    elif any(b.sex == 'F' and b.is_adult() for b in grid.bunnies if abs(b.x - bunny.x) + abs(b.y - bunny.y) <= 3):
-        reward += 2 # Small incentive for being near a female
+    # elif any(b.sex == 'F' and b.is_adult() for b in grid.bunnies if abs(b.x - bunny.x) + abs(b.y - bunny.y) <= 3):
+    #     reward += 2 # Small incentive for being near a female
 
-    if vampires:
+    if vampires or is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
         reward -= 20    # Dangerous neighborhood
     if any(b.sex == 'F' and b.has_baby for b in neighbors):
         reward += 10  # Found a female with a baby
@@ -84,7 +100,10 @@ def reward_func_vampire(bunny, grid):
     reward = 1
     neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
     victims = [b for b in neighbors if not b.is_mutant]
-
+    adults = sum(1 for b in grid.bunnies if b.is_adult)
+    
+    if adults <= 15:
+        reward -= 10   # Too few adults, risk of extinction
     if victims:
         reward += 10 # Successfully infected a bunny
     else:
@@ -102,10 +121,15 @@ def reward_func_juvenile(bunny, grid):
         return 0
 
     reward = 1
+
+    if is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
+        reward -= 10 # Near vampires
+    else:
+        reward += 5
     if bunny.age >= 2:
         reward += 10 # Grown into adult
-    if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
-        reward -= 10 # Mutated into vampire
+    #if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
+    #    reward -= 10 # Mutated into vampire
 
     return reward
 
@@ -175,8 +199,13 @@ class FSMDispatcher:
 
 
         if self.mode == "RL":
+            s = agent.get_state(grid)
             agent.step(grid, turn, logger, reward_fn)
-            return reward_fn(bunny, grid), role  # you could capture this inside step() as well
+            #return reward_fn(bunny, grid), role  # you could capture this inside step() as well
+            s_prime = agent.get_state(grid)            
+            reward = reward_fn(bunny, grid)
+            agent.update_q(s, 5, reward, s_prime)
+            return reward, role
         #else:
         #    s = agent.get_state(grid)
         #    if btype == 'vampire':
