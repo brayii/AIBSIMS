@@ -44,7 +44,8 @@ def main():
             bunnies = list(grid.bunnies)  # avoid mutation during loop
             for bunny in bunnies:
                 bunny.update(grid, turn)
-                total_reward += dispatcher.update_bunny(bunny, grid, turn)  
+                reward, _ = dispatcher.update_bunny(bunny, grid, turn)
+                total_reward += reward  
 
             avg_reward = total_reward / len(grid.bunnies) if grid.bunnies else 0
     

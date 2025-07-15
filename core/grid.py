@@ -192,22 +192,22 @@ class Grid:
             py = bunny.y * TILE_SIZE
             bunny.draw(self.screen, px, py)
         
-        # track colony bonuses
-        population_size = len(self.bunnies)
-
-        # bonus if colony grows past 200
-        if population_size >= 20:
-            self.colony_rewards["population_bonus"] = 50
-        elif population_size <= 15:
-            self.colony_rewards["population_bonus"] = -100
-        else:
-            self.colony_rewards["population_bonus"] = 0
-
-        # vampire-free bonus
-        if self.total_vampire_births == 0:
-            self.colony_rewards["vampire_free_bonus"] += 1  # +1 per vampire-free turn
-        else:
-            self.colony_rewards["vampire_free_bonus"] = 0
+        ## track colony bonuses
+        #population_size = len(self.bunnies)
+#
+        ## bonus if colony grows past 200
+        #if population_size >= 20:
+        #    self.colony_rewards["population_bonus"] = 50
+        #elif population_size <= 15:
+        #    self.colony_rewards["population_bonus"] = -100
+        #else:
+        #    self.colony_rewards["population_bonus"] = 0
+#
+        ## vampire-free bonus
+        #if self.total_vampire_births == 0:
+        #    self.colony_rewards["vampire_free_bonus"] += 1  # +1 per vampire-free turn
+        #else:
+        #    self.colony_rewards["vampire_free_bonus"] = 0
 
         
         self.draw_grid()
