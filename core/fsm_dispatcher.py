@@ -2,6 +2,7 @@
 
 
 import random
+import math
 from core.rl_agent import BunnyRLAgent, load_agent_qtable 
 
 
@@ -56,7 +57,7 @@ def reward_func_female(bunny, grid):
     #colony_reward = grid.colony_rewards["population_bonus"] + grid.colony_rewards["vampire_free_bonus"]
     #reward += 0.1 * colony_reward  # scaled contribution
     
-    return reward
+    return math.tanh(reward / 50.0)
     
 
 
@@ -114,7 +115,7 @@ def reward_func_vampire(bunny, grid):
     if bunny.age > bunny.max_age():
         reward -= 50  # Death penalty
 
-    return reward
+    return math.tanh(reward / 50.0)
 
 def reward_func_juvenile(bunny, grid):
     if bunny.is_adult or bunny.is_mutant:
@@ -131,7 +132,7 @@ def reward_func_juvenile(bunny, grid):
     #if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
     #    reward -= 10 # Mutated into vampire
 
-    return reward
+    return math.tanh(reward / 50.0)
 
 #def vampire_nearby(bunny, grid):
 #        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
@@ -196,6 +197,8 @@ class FSMDispatcher:
         if bunny.name not in self.rl_agents:
             self.rl_agents[bunny.name] = BunnyRLAgent(bunny, self.shared_tables[btype])
         agent = self.rl_agents[bunny.name]
+        agent.use_dqn = True
+        agent.load_model()
 
 
         if self.mode == "RL":
@@ -204,7 +207,11 @@ class FSMDispatcher:
             #return reward_fn(bunny, grid), role  # you could capture this inside step() as well
             s_prime = agent.get_state(grid)            
             reward = reward_fn(bunny, grid)
-            agent.update_q(s, 5, reward, s_prime)
+            agent.update_q(s, 5, reward, s_prime, grid)
+            #if turn % 5 == 0:
+            max_turns = 10
+            if agent.use_dqn and (turn % 5 == 0 or turn == max_turns - 1):
+                agent.save_model()  # Auto-save per-role
             return reward, role
         #else:
         #    s = agent.get_state(grid)
@@ -237,7 +244,7 @@ class FSMDispatcher:
 #            # Update Q-table based on FSM decision as if action 5 was taken
             s_prime = agent.get_state(grid)            
             reward = reward_fn(bunny, grid)
-            agent.update_q(s, 5, reward, s_prime)
+            agent.update_q(s, 5, reward, s_prime, grid)
             return reward, role
         
         return 0, None  # Default case, shouldn't happen
