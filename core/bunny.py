@@ -26,11 +26,11 @@ class Bunny:
         grid.total_bunny_births += 1
         is_mutant = False
 
-        if grid.total_bunny_births > 0:
-            ratio = grid.total_vampire_births / grid.total_bunny_births
-            if ratio < 0.02 and random.random() < 0.02:
-                is_mutant = True
-                grid.total_vampire_births += 1
+        # if grid.total_bunny_births > 0:
+        #     ratio = grid.total_vampire_births / grid.total_bunny_births
+        #     if ratio < 0.02 and random.random() < 0.02:
+        #         is_mutant = True
+        #         grid.total_vampire_births += 1
 
         return Bunny(
             name=f"{self.name}_baby",
@@ -51,19 +51,28 @@ class Bunny:
     def move(self, dx, dy, grid):
         """Move the bunny by (dx, dy) if the target cell is empty and in bounds."""
         nx, ny = self.x + dx, self.y + dy
-        if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
-            grid.cells[self.x][self.y] = None
+        if grid.in_bounds(nx, ny) and grid.cells[ny][nx] is None:
+            # clear old position
+            grid.cells[self.y][self.x] = None
+            grid.bunny_map.pop((self.x, self.y), None)
+
+            # update bunny coordinates
             self.x, self.y = nx, ny
-            grid.cells[nx][ny] = self
+
+            # set new position
+            grid.cells[ny][nx] = self
+            grid.bunny_map[(nx, ny)] = self
             
     def move_random(self, grid):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         random.shuffle(directions)
         for dx, dy in directions:
-            nx, ny = self.x + dx, self.y + dy
-            if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
-                grid.move_bunny(self, nx, ny)
-                return
+            self.move(dx, dy, grid)
+            return
+            # nx, ny = self.x + dx, self.y + dy
+            # if grid.in_bounds(nx, ny) and grid.cells[nx][ny] is None:
+            #     grid.move_bunny(self, nx, ny)
+            #     return
             
     def draw(self, screen, px, py):
         """Draw the bunny on the screen at position (px, py)."""

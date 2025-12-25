@@ -5,7 +5,7 @@ import time
 from core.grid import Grid, SCREEN_WIDTH, SCREEN_HEIGHT
 from core.fsm_dispatcher import FSMDispatcher
 from core.logger import EventLogger
-from core.rl_agent import save_all_agents
+
 
 def main():
     pygame.init()
@@ -13,8 +13,8 @@ def main():
     pygame.display.set_caption("Bunny Simulator")
 
     grid = Grid(screen)
-    dispatcher = FSMDispatcher(mode="RL")  # FSM or RL
-    #logger = EventLogger()
+    dispatcher = FSMDispatcher()  # FSM or RL
+    logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
     clock = pygame.time.Clock()
@@ -40,15 +40,11 @@ def main():
                 grid.female_heatmap.decay()
                 grid.female_heatmap.update_from_sightings(grid.bunnies)
 
-            total_reward = 0
+            # total_reward = 0
             bunnies = list(grid.bunnies)  # avoid mutation during loop
             for bunny in bunnies:
                 bunny.update(grid, turn)
-                reward, _ = dispatcher.update_bunny(bunny, grid, turn)
-                total_reward += reward  
-
-            avg_reward = total_reward / len(grid.bunnies) if grid.bunnies else 0
-    
+                dispatcher.update_bunny(bunny, grid, turn, logger)  
                 
             # Check for extinction
             if not grid.bunnies:
@@ -69,8 +65,7 @@ def main():
                 f"Turn: {turn}",
                 f"FPS: {fps_display}",
                 f"Bunnies: {len(grid.bunnies)} (Adults: {adults}, Mutants: {mutants})",
-                f"Max Population: {max_population}",
-                f"Avg Reward: {avg_reward:.2f}",
+                f"Max Population: {max_population}"               
             ]
 
             for i, line in enumerate(hud):
@@ -79,18 +74,9 @@ def main():
 
         pygame.display.flip()
 
-    #logger.close()
+    logger.close()
     
-    pygame.quit()
-    
-    save_all_agents(dispatcher.rl_agents, shared=True)
-    print("[INFO] RL agents saved.")
-    #bunnies_trained_population = 15  # Example threshold for trained bunnies
-    #if max_population >= bunnies_trained_population:
-    #    save_all_agents(dispatcher.rl_agents, shared=True)
-    #    print("[INFO] RL agents saved.")
-
-
+    pygame.quit()   
 
 if __name__ == "__main__":
     main()
