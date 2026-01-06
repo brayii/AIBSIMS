@@ -3,6 +3,8 @@
 
 import random
 
+from core import logger
+
 def is_vampire_in_range(grid, x, y, radius=2):
     for dx in range(-radius, radius + 1):
         for dy in range(-radius, radius + 1):
@@ -40,6 +42,7 @@ class FSMDispatcher:
             self.adult_male_behavior(bunny, grid, turn, logger)
         else:
             self.adult_female_behavior(bunny, grid, turn, logger)
+        # bunny.state = "IDLE"  # Reset state after action
 
 
     def juvenile_behavior(self, bunny, grid, turn, logger):
@@ -47,31 +50,35 @@ class FSMDispatcher:
         #     logger.log(turn, "move", bunny, bunny.state, controller="FSM")
         # else:
         #     pass
-
-        if any(b.is_mutant for b in grid.get_adjacent_bunnies(bunny.x, bunny.y)):
-            bunny.is_mutant = True
-            if logger:
-                logger.log(turn, "mutation", bunny, "converted to vampire")
-            return
-# 
         if bunny.age >= 2:
+            state = "AGE_UP"
+        elif is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
+            state = "FLEE_VAMPIRE"
+        else:
+            state = "WANDER"
+        
+        if bunny.state != state:
+            bunny.state = state
+    
+        # Execute behavior
+        if bunny.state == "AGE_UP":
             bunny.adult = True
+            bunny.state = "IDLE"  # Reset state
             if logger:
-                logger.log(turn, "adult", bunny, "became adult")
-
-        if is_vampire_in_range(grid, bunny.x, bunny.y, radius=2):
+                logger.log(turn, "adult", bunny, "became adult", controller="FSM")
+        elif bunny.state == "FLEE_VAMPIRE":
             safe_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
             best = max(safe_tiles, key=lambda t: grid.nearest_vampire_distance(*t) or -1, default=None)
             if best:
                 # grid.move_bunny(bunny, *best)
                 bunny.move(*best, grid)
                 if logger:
-                    logger.log(turn, "flee", bunny, f"fled to {best}")
-            else:
-                bunny.move_random(grid)
+                    logger.log(turn, "flee", bunny, f"fled to {best}", controller="FSM")
         else:
             bunny.move_random(grid)
-
+            if logger:
+                logger.log(turn, "move", bunny, "wandering", controller="FSM")  
+        # bunny.state = "IDLE"  # Reset state after action   
 
 
     def adult_female_behavior(self, bunny, grid, turn, logger):
@@ -81,34 +88,48 @@ class FSMDispatcher:
         males = [b for b in neighbors if b.sex == 'M' and b.is_adult() and not b.is_mutant]        
         empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
 
-        if vampires and babies:
-            state = "PROTECT"
+        if males and empty_tiles:
+            state = "BREED" 
+        elif males:
+            state = "SEEK_MATE"          
         elif vampires:
             state = "FLEE_VAMPIRE"
-        elif males and empty_tiles:
-            state = "BREED"
-        # elif males:
-        #     state = "SEEK_MATE"
         else:
             state = "IDLE"
+
+        # if vampires and babies:
+        #     state = "PROTECT"
+        # elif vampires:
+        #     state = "FLEE_VAMPIRE"
+        # elif males and empty_tiles:
+        #     state = "BREED"
+        # # elif males:
+        # #     state = "SEEK_MATE"
+        # else:
+        #    state = "IDLE"
         
         if bunny.state != state:
             bunny.state = state
             #if logger:
             #    logger.log(turn, "state", bunny, f"FSM: {state}")   
 
-        if state == "PROTECT":
-            self.move_away_from_threat(bunny, grid, vampires)  # Simple block
-            if logger:
-                logger.log(turn, "protect", bunny, "shielded baby from vampire", f"FSM: {state}")
-        elif state == "FLEE_VAMPIRE":
+        # if logger:
+        #     logger.log(turn, "debug", bunny,
+        #                f"males={len(males)} empty={len(empty_tiles)} vampires={len(vampires)} babies={len(babies)}",
+        #                f"FSM: {state}")
+    
+        # if state == "PROTECT":
+        #     self.move_away_from_threat(bunny, grid, vampires)  # Simple block
+        #     if logger:
+        #         logger.log(turn, "protect", bunny, "shielded baby from vampire", f"FSM: {state}")
+        if state == "FLEE_VAMPIRE":
             self.move_away_from_threat(bunny, grid, vampires)
             if logger:
                 logger.log(turn, "flee", bunny, "escaped vampire", f"FSM: {state}")
-        # elif state == "SEEK_MATE":
-        #     grid.move_toward(bunny, males[0].x, males[0].y)
-        #     if logger:
-        #         logger.log(turn, "seek", bunny, f"moving toward male {males[0].name}", f"FSM: {state}")
+        elif state == "SEEK_MATE":
+            grid.move_toward(bunny, males[0].x, males[0].y)
+            if logger:
+                logger.log(turn, "seek", bunny, f"moving toward male {males[0].name}", f"FSM: {state}")
         elif state == "BREED":
             if empty_tiles:
                 nx, ny = random.choice(empty_tiles)
@@ -120,6 +141,8 @@ class FSMDispatcher:
             bunny.move_random(grid)
             if logger:
                 logger.log(turn, "move", bunny, "wandering", f"FSM: {state}")
+        # bunny.has_baby = False  # Reset after breeding attempt
+        #bunny.state = "IDLE"  # Reset state after action
 
 
     def adult_male_behavior(self, bunny, grid, turn, logger):  
@@ -155,6 +178,7 @@ class FSMDispatcher:
         #    bunny.move_random(grid)
         #    if logger:
         #        logger.log(turn, "move", bunny, "wandering")
+        #bunny.state = "IDLE"  # Reset state after action
 
     def vampire_behavior(self, bunny, grid, turn, logger):
         # if logger:     
@@ -164,15 +188,40 @@ class FSMDispatcher:
         
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
         victims = [b for b in neighbors if not b.is_mutant]
+
         if victims:
-             victim = random.choice(victims)
-             victim.is_mutant = True
-             if logger:
-                 logger.log(turn, "infection", bunny, f"infected {victim.name}")
+            state = "INFECT"
         else:
-             bunny.move_random(grid)
-             if logger:
-                 logger.log(turn, "move", bunny, "wandering")
+            state = "WANDER"
+
+        if bunny.state != state:
+            bunny.state = state
+            #if logger:
+            #    logger.log(turn, "state", bunny, f"FSM: {state}")
+        
+        if bunny.state == "INFECT":
+            victim = random.choice(victims)           
+            victim.is_mutant = True
+            victim.state = "IDLE"  # Reset state
+            grid.total_vampire_births += 1
+            bunny.move_random(grid)
+            if logger:
+                logger.log(turn, "mutation", bunny, "converted to vampire")
+        else:
+            bunny.move_random(grid)
+            if logger:
+                logger.log(turn, "move", bunny, "wandering")
+        #bunny.state = "IDLE"  # Reset state after action
+
+        # if victims:
+        #      victim = random.choice(victims)
+        #      victim.is_mutant = True
+        #      if logger:
+        #          logger.log(turn, "infection", bunny, f"infected {victim.name}")
+        # else:
+        #      bunny.move_random(grid)
+        #      if logger:
+        #          logger.log(turn, "move", bunny, "wandering")
             
             # heatmap = grid.get_bunny_density_map()
             # best = None

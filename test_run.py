@@ -50,5 +50,5 @@ def run_simulation(turn_limit=50):
     pygame.quit()
 
 if __name__ == "__main__":
-    run_simulation()
+    run_simulation(500)
 
