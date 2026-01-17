@@ -3,7 +3,6 @@
 import pygame
 import time
 from core.grid import Grid, SCREEN_WIDTH, SCREEN_HEIGHT
-from core.fsm_dispatcher import FSMDispatcher
 from core.logger import EventLogger
 
 
@@ -13,14 +12,14 @@ def main():
     pygame.display.set_caption("Bunny Simulator")
 
     grid = Grid(screen)
-    # dispatcher = FSMDispatcher()  # FSM or RL
+    
     # logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
     clock = pygame.time.Clock()
 
     turn = 0
-    max_population = 0
+
 
     running = True
     while running:
@@ -33,44 +32,12 @@ def main():
 
         # Simulation step every 500ms
         if turn == 0 or pygame.time.get_ticks() % 500 < 20:
-            turn += 1            
-                    
-            # Update heatmap before agent logic
-            # if grid.female_heatmap:
-            #     grid.female_heatmap.decay()
-            #     grid.female_heatmap.update_from_sightings(grid.bunnies)
-
-            # total_reward = 0
-            # bunnies = list(grid.bunnies)  # avoid mutation during loop
-            # for bunny in bunnies:
-            #     bunny.update(grid, turn)
-            #     dispatcher.update_bunny(bunny, grid, turn, logger)  
-                
-            # Check for extinction
-            # if not grid.bunnies:
-            #     print(f"Simulation ended at turn {turn} — all bunnies are gone.")
-            #     running = False
-            #     break
+            turn += 1          
+  
             
             # Draw grid and bunnies
             grid.update()
-
-            # --- HUD Metrics ---
-            # adults = sum(1 for b in grid.bunnies if b.is_adult)
-            # mutants = sum(1 for b in grid.bunnies if b.is_mutant)
-            # max_population = max(max_population, len(grid.bunnies))
-            # fps_display = f"{fps:.1f}" if fps > 1.0 else "--"
-
-            # hud = [
-            #     f"Turn: {turn}",
-            #     f"FPS: {fps_display}",
-            #     f"Bunnies: {len(grid.bunnies)} (Adults: {adults}, Mutants: {mutants})",
-            #     f"Max Population: {max_population}"               
-            # ]
-
-            # for i, line in enumerate(hud):
-            #     text = font.render(line, True, (255, 255, 255))
-            #     screen.blit(text, (10, 10 + i * 20))
+ 
 
         pygame.display.flip()
 
