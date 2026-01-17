@@ -23,15 +23,15 @@ class FSMDispatcher:
 
     def update_bunny(self, bunny, grid, turn, logger=None):
         # Determine bunny type and reward function — used in both FSM and RL
-        if bunny.is_mutant:
-            btype = 'vampire'           
-        elif not bunny.is_adult():
-            btype = 'juvenile'           
-        elif bunny.sex == "M":
-            btype = 'male'            
-        else:
-            btype = 'female'   
-        role = btype  
+        # if bunny.is_mutant:
+        #     btype = 'vampire'           
+        # elif not bunny.is_adult():
+        #     btype = 'juvenile'           
+        # elif bunny.sex == "M":
+        #     btype = 'male'            
+        # else:
+        #     btype = 'female'   
+        # role = btype  
 
         # FSM behavior execution
         if bunny.is_mutant:

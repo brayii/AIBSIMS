@@ -17,16 +17,16 @@ GRID_COLOR = (60, 60, 60)
 class Grid:
     def __init__(self, screen):
         self.screen = screen
-        self.bunnies = []
-        self.bunny_map = {}
+        # self.bunnies = []
+        # self.bunny_map = {}
 
         
         self.cells = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 
-        self.spawn_initial_bunnies()
-        self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
-        self.total_bunny_births = 0
-        self.total_vampire_births = 0        
+        # self.spawn_initial_bunnies()
+        # self.female_heatmap = FemaleHeatmap(self.GRID_WIDTH, self.GRID_HEIGHT)
+        # self.total_bunny_births = 0
+        # self.total_vampire_births = 0        
 
     def get_bunny_at(self, x, y):
         """Safe access: return the bunny at (x, y) or None if out-of-bounds or empty."""
@@ -132,12 +132,12 @@ class Grid:
 
     def update(self):
         self.screen.fill(BG_COLOR)
-        for bunny in self.bunnies:
-            px = bunny.x * TILE_SIZE
-            py = bunny.y * TILE_SIZE
-            bunny.draw(self.screen, px, py)
+        # for bunny in self.bunnies:
+        #     px = bunny.x * TILE_SIZE
+        #     py = bunny.y * TILE_SIZE
+        #     bunny.draw(self.screen, px, py)
         self.draw_grid()
-        self.draw_entities()
+        # self.draw_entities()
         pygame.display.flip()
 
     def get_bunny_density_map(self):
