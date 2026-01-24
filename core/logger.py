@@ -10,7 +10,7 @@ class EventLogger:
         self.path = os.path.join(log_dir, f"log_{timestamp}.csv")
         self.file = open(self.path, "w", newline="")
         self.writer = csv.writer(self.file)
-        self.writer.writerow(["turn", "event_type", "bunny_name", "sex", "age", "location", "details", "controller"])
+        self.writer.writerow(["turn", "event_type", "bunny_name", "sex", "age", "mutant", "location", "details", "controller"])
 
     def log(self, turn, event_type, bunny, detail, controller="FSM"):
         self.writer.writerow([
@@ -19,6 +19,7 @@ class EventLogger:
             bunny.name,
             bunny.sex,
             bunny.age,
+            bunny.is_mutant,
             f"({bunny.x},{bunny.y})",
             detail,
             controller

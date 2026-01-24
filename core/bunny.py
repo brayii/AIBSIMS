@@ -36,19 +36,25 @@ class Bunny:
         return 50 if self.is_mutant else 10
     
     def make_baby(self, motherColor, x, y): 
-
+        
         return Bunny(random.choice(['M', 'F']), x=x, y=y, age=0, mutant=False if random.random() > 0.02 else True, color=motherColor)
         
+    def bunny_death(self, grid):
+        if self.age >= self.max_age():
+            grid.cells[self.y][self.x] = None
+            grid.bunnies.remove(self)
+            return True
+        else:
+            return False
 
-    
-    def update(self, grid, logger=None):
+    def update(self, grid):
         self.age += 1
         
-        if self.age > self.max_age():
-            # Bunny dies of old age
-            grid.cells[self.y][self.x] = None
-            grid.bunnies.remove(self) 
-            
+        # if self.age > self.max_age():
+        #     # Bunny dies of old age
+        #     grid.cells[self.y][self.x] = None
+        #     grid.bunnies.remove(self) 
+
 
     def move(self, dx, dy, grid):
         new_x = self.x + dx
@@ -56,7 +62,7 @@ class Bunny:
         if grid.is_empty(new_x, new_y):
             grid.cells[self.y][self.x] = None # Update grid cell
             self.x = new_x
-            self.y = new_y           
+            self.y = new_y                      
             return True
         return False
 

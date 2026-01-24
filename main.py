@@ -16,12 +16,13 @@ def main():
     grid = Grid(screen)
     fsm_dispatcher = FSMDispatcher()
     
-    # logger = EventLogger()
+    logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
     clock = pygame.time.Clock()
 
     turn = 0
+    fsm_dispatcher.dispatch(None, grid, turn, logger=logger)
 
 
     running = True
@@ -44,9 +45,9 @@ def main():
                 running = False
                 continue
 
-            print(f"Turn {turn}, Bunnies: {len(grid.bunnies)}, Target: {target_bunnies_count}")
+            # print(f"Turn {turn}, Bunnies: {len(grid.bunnies)}, Target: {target_bunnies_count}")
             if len(grid.bunnies) > target_bunnies_count:
-                #tmp_bunnies = grid.bunnies.copy()
+                # tmp_bunnies = grid.bunnies.copy()
                 random.shuffle(grid.bunnies)
                 
                 # purge half of the excess bunnies
@@ -54,13 +55,15 @@ def main():
                 for bunny in grid.bunnies:
                     grid.bunnies.remove(bunny)
                     grid.cells[bunny.y][bunny.x] = None
+                    if logger:
+                        logger.log(turn, "death", bunny, "Removed due to overpopulation", controller="Main")
                     count +=1
                     if count >= bunny_count/2:
                         break
 
             for bunny in grid.bunnies:
-                fsm_dispatcher.dispatch(bunny, grid, turn, logger=None)
-                bunny.update(grid,logger=None)
+                fsm_dispatcher.dispatch(bunny, grid, turn, logger=logger)
+                bunny.update(grid)
 
             # Draw grid and bunnies
             grid.update()
@@ -70,7 +73,7 @@ def main():
 
         pygame.display.flip()
 
-    # logger.close()
+    logger.close()
     
     pygame.quit()   
 
