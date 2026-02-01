@@ -40,10 +40,10 @@ class Bunny:
         return Bunny(random.choice(['M', 'F']), x=x, y=y, age=0, mutant=False if random.random() > 0.02 else True, color=motherColor)
         
     def bunny_death(self, grid):
-        if self.age >= self.max_age():
-            grid.cells[self.y][self.x] = None
-            grid.bunnies.remove(self)
-            return True
+        if self.age > self.max_age():
+            # grid.cells[self.y][self.x] = None
+            # grid.bunnies.remove(self)
+            return grid.remove_bunny(self)
         else:
             return False
 
@@ -66,7 +66,31 @@ class Bunny:
             return True
         return False
 
-            
+    def draw_male_marker(self, screen, px, py):
+        font = pygame.font.SysFont(None, 24) 
+        text_surface = font.render("M", True, (0, 0, 255)) # blue for
+        text_rect = text_surface.get_rect(center=(px + 16, py + 16)) 
+        screen.blit(text_surface, text_rect)
+
+    def draw_female_marker(self, screen, px, py):
+        font = pygame.font.SysFont(None, 24) 
+        text_surface = font.render("F", True, (255, 192, 203)) # pink for
+        text_rect = text_surface.get_rect(center=(px + 16, py + 16)) 
+        screen.blit(text_surface, text_rect)
+
+    def draw_mutant_marker(self, screen, px, py):
+        font = pygame.font.SysFont(None, 24) 
+        text_surface = font.render("X", True, (255, 255, 255)) # white for
+        text_rect = text_surface.get_rect(center=(px + 16, py + 16)) 
+        screen.blit(text_surface, text_rect)    
+
+    def draw_baby_marker(self, screen, px, py):
+        size = 32
+        padding = 8
+        rect = pygame.Rect(px + padding, py + padding, size - 2 * padding, size - 2 * padding)
+        pygame.draw.ellipse(screen, (255, 255, 0), rect)  # yellow for babies   
+
+
     def draw(self, screen, px, py):
         # Draw a square for the bunny
         size = 32
@@ -76,25 +100,35 @@ class Bunny:
         
         # Male indicator (blue M)
         if self.sex == 'M':
-            font = pygame.font.SysFont(None, 24) 
-            text_surface = font.render("M", True, (0, 0, 255)) # blue for Males 
-            text_rect = text_surface.get_rect(center=rect.center) 
-            screen.blit(text_surface, text_rect)
+            self.draw_male_marker(screen, px, py)
+            # font = pygame.font.SysFont(None, 24) 
+            # text_surface = font.render("M", True, (0, 0, 255)) # blue for Males 
+            # text_rect = text_surface.get_rect(center=rect.center) 
+            # screen.blit(text_surface, text_rect)
         # Female indicator (pink F)
         elif self.sex == 'F':
-            font = pygame.font.SysFont(None, 24) 
-            text_surface = font.render("F", True, (255, 192, 203)) # pink for Females 
-            text_rect = text_surface.get_rect(center=rect.center) 
-            screen.blit(text_surface, text_rect)
+            self.draw_female_marker(screen, px, py)
+            # font = pygame.font.SysFont(None, 24) 
+            # text_surface = font.render("F", True, (255, 192, 203)) # pink for Females 
+            # text_rect = text_surface.get_rect(center=rect.center) 
+            # screen.blit(text_surface, text_rect)
         # mutant indicator (white X for mutants)
         elif self.is_mutant:
-            font = pygame.font.SysFont(None, 24) 
-            text_surface = font.render("X", True, (255, 255, 255)) # white for mutants
-            text_rect = text_surface.get_rect(center=rect.center) 
-            screen.blit(text_surface, text_rect)
+            self.draw_mutant_marker(screen, px, py)
+            # font = pygame.font.SysFont(None, 24) 
+            # text_surface = font.render("X", True, (255, 255, 255)) # white for mutants
+            # text_rect = text_surface.get_rect(center=rect.center) 
+            # screen.blit(text_surface, text_rect)
+        # elif not self.is_adult():
+        #     self.draw_baby_marker(screen, px, py)
+            # size = 32
+            # padding = 8
+            # rect = pygame.Rect(px + padding, py + padding, size - 2 * padding, size - 2 * padding)
+            # pygame.draw.ellipse(screen, (255, 255, 0), rect)  # yellow for babies
         else:
             pass # No indicator
 
         if not self.is_adult():
             # Draw a smaller ellipse in the center to indicate a baby
-            pygame.draw.ellipse(screen, (255, 255, 0), rect.inflate(-size // 2, -size // 2))  # yellow for babies
+            self.draw_baby_marker(screen, px, py)
+            # pygame.draw.ellipse(screen, (255, 255, 0), rect.inflate(-size // 2, -size // 2))  # yellow for babies

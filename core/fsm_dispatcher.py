@@ -1,6 +1,8 @@
 # core/fsm_dispatcher.py
 
 import random
+from core import grid, logger
+from core import bunny
 from core.bunny import Bunny
 from core.grid import GRID_WIDTH, GRID_HEIGHT
 
@@ -17,12 +19,7 @@ class FSMDispatcher:
                 (139, 69, 19), # brown
                 (255, 255, 255), # white
                 (192, 192, 192) # gray
-             ]
-
-            # self.bunnies.append(Bunny(sex="M", x=10, y=10))
-            # self.cells[10][10] = self.bunnies[-1]   
-            # self.bunnies.append(Bunny(sex="F", x=11, y=10))
-            # self.cells[10][11] = self.bunnies[-1]
+             ]        
 
             pairs = [("F", "M"), ("F", "M")]
             for i, (s1, s2) in enumerate(pairs):
@@ -69,25 +66,20 @@ class FSMDispatcher:
         # ['breeded', 'move', 'rest']
         #state = 'rest'
         if bunny.is_mutant and not bunny.is_adult():
-            return
+            return     
         
-        # if bunny.bunny_death(grid):
-        #     if logger:
-        #         logger.log(turn, "death", bunny, "Died of old age", controller="FSM")
-        #     return
-
-
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
         # print(f"Bunny at ({bunny.x},{bunny.y}) has {len(neighbors)} adjacent bunnies.") 
         male = [m for m in neighbors if m.sex == 'M'and m.is_adult() and not bunny.is_mutant]
         if len(neighbors) == 0 or not male or bunny.is_mutant:
             empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
             if empty_tiles:
+                self.move_randomly(bunny, grid, logger, turn)
                 # print(f"Bunny at ({bunny.x},{bunny.y}) moving to empty tile.")
-                dx, dy = random.choice(empty_tiles)
-                bunny.move(dx - bunny.x, dy - bunny.y, grid)
-                if logger:
-                    logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
+                # dx, dy = random.choice(empty_tiles)
+                # bunny.move(dx - bunny.x, dy - bunny.y, grid)
+                # if logger:
+                #     logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
                 return
           
         for neighbor in neighbors:
@@ -99,6 +91,10 @@ class FSMDispatcher:
                     if logger:
                         logger.log(turn, "breeding", bunny, f"Bred with male at ({neighbor.x},{neighbor.y})", controller="FSM")
                     grid.place_bunny(bunny.make_baby(bunny.color, x, y), x, y)
+                else:
+                    if logger:
+                        logger.log(turn, "breeding_failed", bunny, f"No space to place baby despite mate at ({neighbor.x},{neighbor.y})")
+
                 return
            
             else:
@@ -110,22 +106,20 @@ class FSMDispatcher:
     def male_behavior(self, bunny, grid, turn, logger=None):
         # Placeholder for male behavior logic
         if bunny.is_mutant and not bunny.is_adult():
-            return
-        
-        # if bunny.bunny_death(grid):
-        #     if logger:
-        #         logger.log(turn, "death", bunny, "Died of old age", controller="FSM")
-        #     return
+            return        
+     
         
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         #direction = random.shuffle(directions)
         empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
         if empty_tiles:
+            self.move_randomly(bunny, grid, logger, turn)
+            return
             # print(f"Bunny at ({bunny.x},{bunny.y}) moving to empty tile.")
-            dx, dy = random.choice(empty_tiles)
-            bunny.move(dx - bunny.x, dy - bunny.y, grid)
-            if logger:
-                logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
+            # dx, dy = random.choice(empty_tiles)
+            # bunny.move(dx - bunny.x, dy - bunny.y, grid)
+            # if logger:
+            #     logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
         else:
             pass
 
@@ -137,30 +131,27 @@ class FSMDispatcher:
         
         empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
         if empty_tiles:
+            self.move_randomly(bunny, grid, logger, turn)
             # print(f"Bunny at ({bunny.x},{bunny.y}) moving to empty tile.")
-            dx, dy = random.choice(empty_tiles)
-            bunny.move(dx - bunny.x, dy - bunny.y, grid)
-            if logger:
-                logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")    
+            # dx, dy = random.choice(empty_tiles)
+            # bunny.move(dx - bunny.x, dy - bunny.y, grid)
+            # if logger:
+            #     logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")    
 
 
     def mutant_behavior(self, bunny, grid, turn, logger=None):
-        # Placeholder for mutant behavior logic
-        # if bunny.bunny_death(grid):
-        #     if logger:
-        #         logger.log(turn, "death", bunny, "Died of old age", controller="FSM")
-        #     return
-
+        # Placeholder for mutant behavior logic     
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
 
         if len(neighbors) == 0 or bunny.is_mutant:
             empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
             if empty_tiles:
+                self.move_randomly(bunny, grid, logger, turn)
                 # print(f"Bunny at ({bunny.x},{bunny.y}) moving to empty tile.")
-                dx, dy = random.choice(empty_tiles)
-                bunny.move(dx - bunny.x, dy - bunny.y, grid)
-                if logger:
-                    logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
+                # dx, dy = random.choice(empty_tiles)
+                # bunny.move(dx - bunny.x, dy - bunny.y, grid)
+                # if logger:
+                #     logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
         
         for neighbor in neighbors:
             if not neighbor.is_mutant:
@@ -170,3 +161,11 @@ class FSMDispatcher:
                 if logger:
                     logger.log(turn, "infection", neighbor, "Infected by mutant bunny", controller="FSM")
                 return
+            
+    def move_randomly(self, bunny, grid, logger, turn):
+        tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
+        if tiles:
+            dx, dy = random.choice(tiles)
+            bunny.move(dx - bunny.x, dy - bunny.y, grid)
+            if logger:
+                logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
