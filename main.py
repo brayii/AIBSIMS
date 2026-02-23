@@ -3,10 +3,14 @@
 import pygame
 import time
 import random
+import os
 from core.grid import Grid, SCREEN_WIDTH, SCREEN_HEIGHT
 from core.logger import EventLogger
 from core.fsm_dispatcher import FSMDispatcher
+from core.sl_dispatcher import SLDispatcher
 
+# constants MODE for FSM, RL, and SL 
+MODE = "SL"  # Change to "RL" or "FSM" as needed
 
 def main():
     pygame.init()
@@ -14,7 +18,16 @@ def main():
     pygame.display.set_caption("Bunny Simulator")
 
     grid = Grid(screen)
-    fsm_dispatcher = FSMDispatcher()
+    
+    # Initialize the appropriate dispatcher based on MODE
+    if MODE == "FSM":
+        dispatcher = FSMDispatcher()
+    elif MODE == "RL":        
+        dispatcher = RLDispatcher()
+    elif MODE == "SL":
+        dispatcher = SLDispatcher()
+    else:
+        raise ValueError("Invalid MODE. Choose 'FSM', 'RL', or 'SL'.")
     
     logger = EventLogger()
 
@@ -22,7 +35,11 @@ def main():
     clock = pygame.time.Clock()
 
     turn = 0
-    fsm_dispatcher.dispatch(None, grid, turn, logger=logger)
+    dispatcher.dispatch(None, grid, turn, logger=logger)
+
+    # save log file if bunny reaches a min
+    bunny_count_min = 30
+    count_min = False
 
 
     running = True
@@ -52,7 +69,7 @@ def main():
                 
                 # purge half of the excess bunnies
                 count =0
-                for bunny in grid.bunnies:
+                for bunny in list(grid.bunnies):
                     grid.bunnies.remove(bunny)
                     grid.cells[bunny.y][bunny.x] = None
                     if logger:
@@ -61,19 +78,30 @@ def main():
                     if count >= bunny_count/2:
                         break
 
-            for bunny in grid.bunnies:
-                fsm_dispatcher.dispatch(bunny, grid, turn, logger=logger)
+            for bunny in list(grid.bunnies):
+                dispatcher.dispatch(bunny, grid, turn, logger=logger)
                 bunny.update(grid)
 
             # Draw grid and bunnies
             grid.update()
 
-            
- 
+            if len(grid.bunnies) >= bunny_count_min:
+                count_min = True    
 
         pygame.display.flip()
 
     logger.close()
+    # if not count_min:
+    #     # remove file
+    #     file_path = str(logger.path)       
+# 
+    #     # Check if file exists before deleting
+    #     if os.path.exists(file_path):
+    #         os.remove(file_path)
+    #         print(f"{file_path} deleted successfully.")
+    #     else:
+    #         print("The file does not exist.")
+                
     
     pygame.quit()   
 

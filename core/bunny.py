@@ -7,6 +7,8 @@ class Bunny:
         name = ["Fluffy", "Thumper", "Coco", "BunBun", "Hopper", "Nibbles", "Snowball", "Midnight"]
         self.name = random.choice(name)
 
+        self.id = random.randint(1000, 9999)  # Unique identifier for logging
+
         self.sex = sex  # 'M' or 'F'
        
         self.x = x
@@ -36,8 +38,9 @@ class Bunny:
         return 50 if self.is_mutant else 10
     
     def make_baby(self, motherColor, x, y): 
-        
-        return Bunny(random.choice(['M', 'F']), x=x, y=y, age=0, mutant=False if random.random() > 0.02 else True, color=motherColor)
+        baby = Bunny(random.choice(['M', 'F']), x=x, y=y, age=0, mutant=False if random.random() > 0.02 else True, color=motherColor)
+        baby.id = random.randint(1000, 9999)  # Unique identifier for logging
+        return baby
         
     def bunny_death(self, grid):
         if self.age > self.max_age():
@@ -132,3 +135,15 @@ class Bunny:
             # Draw a smaller ellipse in the center to indicate a baby
             self.draw_baby_marker(screen, px, py)
             # pygame.draw.ellipse(screen, (255, 255, 0), rect.inflate(-size // 2, -size // 2))  # yellow for babies
+    
+    def get_features(self, grid):
+        # Example feature extraction for SL model
+        features = {
+            "x": self.x,
+            "y": self.y,
+            "age": self.age,
+            "is_adult": int(self.is_adult()),
+            "is_mutant": int(self.is_mutant),
+            "sex": 1 if self.sex == 'M' else 0
+        }
+        return features
