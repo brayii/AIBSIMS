@@ -68,6 +68,9 @@ python -m venv env
 source env/Scripts/activate  # or .\env\Scripts\activate.bat on Windows
 pip install -r requirements.txt
 
+.\venv\Scripts\activate.bat
+py -m pip install -r requirements.txt
+
 🧪 Running the Simulation
 
 python main.py

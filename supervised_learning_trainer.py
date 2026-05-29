@@ -71,7 +71,8 @@ def debug_suspicious_move(turn_df, female_row):
 # df = pd.read_csv(csv_file)
 
 # get all csv files in logs folder and concatenate them into one dataframe
-logs_folder = os.path.dirname(__file__)
+# logs_folder = os.path.dirname(__file__)
+logs_folder = "data/logs"  
 csv_files = [f for f in os.listdir(logs_folder) if f.endswith(".csv")]
 df_list = [pd.read_csv(os.path.join(logs_folder, f)) for f in csv_files]
 
@@ -152,11 +153,11 @@ print("Breeding (1):", sum(y_data))
 print("Move (0):", len(y_data) - sum(y_data))
 
 
-import random
+# import random
 
 # Separate indices
-breeding_indices = [i for i, label in enumerate(y_data) if label == 1]
-move_indices = [i for i, label in enumerate(y_data) if label == 0]
+# breeding_indices = [i for i, label in enumerate(y_data) if label == 1]
+# move_indices = [i for i, label in enumerate(y_data) if label == 0]
 
 # print("Breeding:", len(breeding_indices))
 # print("Move:", len(move_indices))

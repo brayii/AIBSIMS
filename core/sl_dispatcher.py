@@ -116,53 +116,19 @@ class SLDispatcher:
             if logger:
                 logger.log(turn, "birth", baby, f"Spawned at ({x},{y})", controller="SL")
         else:
-            self.move_randomly(bunny, grid, logger, turn)
-
-    # def female_behavior(self, bunny, grid, turn, logger=None):
-    #     # Placeholder for female behavior logic
-    #     # if bunny.is_mutant and not bunny.is_adult() and not bunny.sex == 'F':
-    #     #     return   
-    #     
-    #     # if logger:
-    #     #     logger.log(turn, "decision", bunny, "Deciding action using SL model", controller="SL")  
-# 
-    #     neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
-    #     empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
-    #     # print(f"Bunny at ({bunny.x},{bunny.y}) has {len(neighbors)} adjacent bunnies.") 
-    #     male = [m for m in neighbors if m.sex == 'M'and m.is_adult() and not m.is_mutant]
-# 
-    #     
-    #     # Log the decision factors
-    #     # features = {
-    #     #     "age": bunny.age,
-    #     #     "is_mutant": int(bunny.is_mutant),           
-    #     #     "adjacent_male": int(len(male) > 0), #  adjacent male = any adjacent in bounds that’s an adult male
-    #     #     "adjacent_empty": int(len(empty_tiles) > 0) # empty tile = any adjacent in bounds that’s empty
-    #     #     # Add more features as needed
-    #     # } 
-    #     # Use the SL model to predict action for this bunny
-    #     #vector = list(features.values())
-    #     vector = [bunny.age, int(bunny.is_mutant), int(len(male) > 0), int(len(empty_tiles) > 0)]
-    #     p_breed = self.female_model.predict_proba([vector])[0][1]  # probability of breeding (class 1)
-    #     threshold = 0.5  # you can tune this threshold based on your model's performance
-    #     action = 1 if p_breed >= threshold else 0  # threshold at 0.5, can be tuned            
-    #     # if logger:
-    #     #     logger.log(turn, "decision", bunny, f"SL features: {features}, p_breed: {p_breed:.2f}, action: {'breed' if action == 1 else 'move'}", controller="SL")  
-    #     if logger:
-    #         logger.log(turn, "decision", bunny, f"SL features: age={bunny.age} mutant={int(bunny.is_mutant)} adj_male={int(len(male) > 0)} adj_empty={int(len(empty_tiles) > 0)} p_breed={p_breed:.2f} action={'breed' if action == 1 else 'move'}", controller="SL")
-    #     if action == 1 and len(male) > 0 and len(empty_tiles) > 0:
-    #         # Attempt to breed
-    #         x, y = random.choice(empty_tiles)
-    #         if logger:
-    #             logger.log(turn, "breeding", bunny, f"Bred  with male at ({male[0].x},{male[0].y}) at ({x},{y})", controller="SL")
-    #         # Create a new bunny
-    #         baby_bunny = bunny.make_baby(bunny.color, x, y)
-    #         grid.place_bunny(baby_bunny, x, y)
-    #         if logger:
-    #             logger.log(turn, "birth", baby_bunny, f"Spawned at ({x},{y})", controller="SL")
-    #     else:
-    #         self.fsm_dispatcher.move_randomly(bunny, grid, logger, turn)
-
+            if not empty_tiles:
+                return  # no move possible
+            if not males:
+                # If no males, move randomly
+                self.move_randomly(bunny, grid, logger, turn)
+            else:   
+                best_tile = min(empty_tiles, 
+                                key=lambda tile: min(
+                                    abs(tile[0] - m.x) + abs(tile[1] - m.y) 
+                                    for m in  males))
+                bunny.move(best_tile[0] - bunny.x, best_tile[1] - bunny.y, grid)
+                if logger:
+                    logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="SL")           
         
     def move_randomly(self, bunny, grid, logger, turn):
         tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
