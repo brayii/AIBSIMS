@@ -152,6 +152,84 @@ print("Total samples:", len(y_data))
 print("Breeding (1):", sum(y_data))
 print("Move (0):", len(y_data) - sum(y_data))
 
+X_male_data = []
+y_male_data = []
+
+for turn in sorted(df["turn"].unique()):
+    turn_df = df[df["turn"] == turn]
+
+    occupied_positions = set(turn_df["location"])
+
+    male_df = turn_df[(turn_df["sex"] == "M") & (turn_df["age"] >= 2) & (turn_df["mutant"] == False)]
+
+    for index, male_row in male_df.iterrows():
+        # skip unwanted event types 
+        if male_row["event_type"] not in ["move", "attempted_breeding"]:
+            continue
+
+        x, y = male_row["location"]
+
+        adjacent_positions = [
+            (x, y - 1),  # North    
+            (x, y + 1),  # South
+            (x - 1, y),  # West 
+            (x + 1, y)   # East
+        ]
+
+        adjacent_positions = [
+            pos for pos in adjacent_positions 
+            if 0 <= pos[0] < GRID_WIDTH and 0 <= pos[1] < GRID_HEIGHT
+        ]
+
+        adjacent_females = turn_df[(
+            turn_df["location"].isin(adjacent_positions)) & 
+            (turn_df["sex"] == "F") & 
+            (turn_df["age"] >= 2) & 
+            (turn_df["mutant"] == False)
+        ]
+
+        adjacent_adult_female = adjacent_females.shape[0] > 0
+
+        female_has_empty = False
+
+        for _,female_row in adjacent_females.iterrows():
+            fx, fy = female_row["location"]
+
+            female_adjacent_positions = [
+                (fx, fy - 1),  # North
+                (fx, fy + 1),  # South  
+                (fx - 1, fy),  # West
+                (fx + 1, fy)   # East   
+            ]
+            female_adjacent_positions = [
+                pos for pos in female_adjacent_positions 
+                if 0 <= pos[0] < GRID_WIDTH and 0 <= pos[1] < GRID_HEIGHT
+            ]  
+
+            if any(pos not in occupied_positions for pos in adjacent_positions):
+                female_has_empty = True
+                break
+
+        x = [
+            male_row["age"],
+            int(male_row["mutant"]),
+            int(adjacent_adult_female),
+            int(female_has_empty)
+        ]
+
+        y = 1 if male_row["event_type"] == "attempted_breeding" else 0
+       
+        X_male_data.append(x)
+        y_male_data.append(y)
+
+print("Total male samples:", len(y_male_data))
+print("Attempted breeding (1):", sum(y_male_data))
+print("Move (0):", len(y_male_data) - sum(y_male_data))
+
+
+        
+
+
 
 # import random
 
@@ -206,9 +284,15 @@ import numpy as np
 X = np.array(X_data, dtype=float)
 y = np.array(y_data, dtype=int)
 
+X_male = np.array(X_male_data, dtype=float)
+y_male = np.array(y_male_data, dtype=int)
+
 print("X shape:", X.shape)  # (num_samples, num_features)
 print("y shape:", y.shape)  # (num_samples,)
 print("Breeding rate:", y.mean())
+print("X_male shape:", X_male.shape)  # (num_samples, num_features)
+print("y_male shape:", y_male.shape)  # (num_samples,)
+print("Male breeding rate:", y_male.mean())
 
 # 2) Train/test split for ML training
 
@@ -219,6 +303,13 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.2,
     random_state=42,
     stratify=y
+)
+
+X_male_train, X_male_test, y_male_train, y_male_test = train_test_split(
+    X_male, y_male,
+    test_size=0.2,
+    random_state=42,
+    stratify=y_male
 )
 
 
@@ -300,21 +391,33 @@ model = LogisticRegression(
 
 model.fit(X_train, y_train)
 
+model_male = LogisticRegression(
+    max_iter=2000,
+    class_weight="balanced",
+    random_state=42
+)
+
+model_male.fit(X_male_train, y_male_train)
+
 # save model for later use in SL dispatcher
 import joblib   
 model_path = "models/sl"
 os.makedirs(model_path, exist_ok=True)  
 joblib.dump(model, os.path.join(model_path, "female_sl_logreg.joblib"))
+joblib.dump(model_male, os.path.join(model_path, "male_sl_logreg.joblib"))
 
 
 # 4) Evaluate correctly (not just accuracy) on test set
 from sklearn.metrics import classification_report, confusion_matrix
 
 y_pred = model.predict(X_test)
+y_male_pred = model_male.predict(X_male_test)
 
 print("Confusion matrix:\n", confusion_matrix(y_test, y_pred))
 print("\nReport:\n", classification_report(y_test, y_pred, target_names=["move", "breeding"]))
 
+print("Male Confusion matrix:\n", confusion_matrix(y_male_test, y_male_pred))
+print("\nMale Report:\n", classification_report(y_male_test, y_male_pred, target_names=["move", "breeding"]))
 
 # 5) Interpret the model (this is the best learning part) 
 # feature_names = ["adjacent_adult_male", "adjacent_empty_tile"]
@@ -323,9 +426,17 @@ feature_names = ["age", "mutant", "adjacent_adult_male", "adjacent_empty_tile"]
 weights = model.coef_[0]
 bias = model.intercept_[0]
 
+feature_names_male = ["age", "mutant", "adjacent_adult_female", "adjacent_female_has_empty"]
+weights_male = model_male.coef_[0]
+bias_male = model_male.intercept_[0]
+
 for name, w in zip(feature_names, weights):
     print(f"{name:>20}: {w: .4f}")
 print(f"{'bias':>20}: {bias: .4f}")
+
+for name, w in zip(feature_names_male, weights_male):
+    print(f"{name:>20}: {w: .4f}")
+print(f"{'bias':>20}: {bias_male: .4f}")
 
 
 # print("Total samples:", len(y_data))

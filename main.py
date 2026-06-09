@@ -35,6 +35,7 @@ def main():
     clock = pygame.time.Clock()
 
     turn = 0
+    max_population = 0
     dispatcher.dispatch(None, grid, turn, logger=logger)
 
     # save log file if bunny reaches a min
@@ -87,6 +88,24 @@ def main():
 
             if len(grid.bunnies) >= bunny_count_min:
                 count_min = True    
+            
+            # --- HUD Metrics ---
+            adults = sum(1 for b in grid.bunnies if b.is_adult)
+            mutants = sum(1 for b in grid.bunnies if b.is_mutant)
+            max_population = max(max_population, len(grid.bunnies))
+            fps_display = f"{fps:.1f}" if fps > 1.0 else "--"
+
+            hud = [
+                f"Turn: {turn}",
+                f"FPS: {fps_display}",
+                f"Bunnies: {len(grid.bunnies)} (Adults: {adults}, Mutants: {mutants})",
+                f"Max Population: {max_population}",
+                f"FPS: {fps_display}"
+            ]
+
+            for i, line in enumerate(hud):
+                text = font.render(line, True, (255, 255, 255))
+                screen.blit(text, (10, 10 + i * 20))
 
         pygame.display.flip()
 

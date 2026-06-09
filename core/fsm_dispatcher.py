@@ -88,7 +88,24 @@ class FSMDispatcher:
             if logger:
                 logger.log(turn, "birth", baby_bunny, f"Spawned at ({x},{y})", controller="FSM")
         else:   
-            self.move_randomly(bunny, grid, logger, turn)
+            empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
+            if not empty_tiles:
+                return  # no move possible  
+            
+            all_males = [b for b in grid.bunnies if b.sex == "M" and b.is_adult() and not b.is_mutant]
+            if not all_males:
+                # If no males, move randomly   
+                self.move_randomly(bunny, grid, logger, turn)
+            else:
+                # Move towards nearest  male
+                best_tile = min(empty_tiles,
+                                key=lambda tile: min(
+                                    abs(tile[0] - m.x) + abs(tile[1] - m.y)
+                                    for m in all_males
+                                ))  
+                bunny.move(best_tile[0] - bunny.x, best_tile[1] - bunny.y, grid)
+                if logger:
+                    logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="FSM")
 
             
     def male_behavior(self, bunny, grid, turn, logger=None):
@@ -108,7 +125,7 @@ class FSMDispatcher:
             # Attempt to breed
             x, y = random.choice(empty_tiles)
             if logger:
-                logger.log(turn, "breeding", bunny, f"Attempted to breed with female at ({female[0].x},{  female[0].y})", controller="FSM")
+                logger.log(turn, "attempted_breeding", bunny, f"Attempted to breed with female at ({female[0].x},{  female[0].y})", controller="FSM")
         else:
             self.move_randomly(bunny, grid, logger, turn)
 

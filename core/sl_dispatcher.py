@@ -1,9 +1,8 @@
-from core import logger
 from core.grid import GRID_WIDTH, GRID_HEIGHT
 from core.bunny import Bunny
 import random
 import os
-from joblib import dump, load
+from joblib import load
 
 from core.fsm_dispatcher import FSMDispatcher
 
@@ -11,15 +10,23 @@ class SLDispatcher:
     def __init__(self, model_path="models/sl"):
         # Load your trained SL model here
         os.makedirs(model_path, exist_ok=True)
-        female_model_path = os.path.join(model_path, "female_sl_logreg.joblib")  
+        female_model_path = os.path.join(model_path, "female_sl_logreg.joblib") 
+        male_model_path = os.path.join(model_path, "male_sl_logreg.joblib")
         if not os.path.exists(female_model_path):
             print(f"Model file {female_model_path} not found. Please train the model and save it to this path.")
             exit(1)
         else:     
             self.female_model = load(female_model_path)
         
+        if not os.path.exists(male_model_path):
+            print(f"Model file {male_model_path} not found. Please train the model and save it to this path.")
+            exit(1)
+        else:
+            self.male_model = load(male_model_path)
+
         self.fsm_dispatcher = FSMDispatcher()  # Create an instance of FSMDispatcher to reuse its methods
         self.threshold = 0.3  # you can tune this threshold based on your model's performance
+        self.mutant_penalty = 10  # you can tune this penalty based on your model's performance
 
     def dispatch(self, bunny, grid, turn, logger=None):
         # Placeholder for FSM logic  
@@ -69,7 +76,8 @@ class SLDispatcher:
         elif bunny.sex == 'F':
             self.female_behavior(bunny, grid, turn, logger)
         else:
-            self.fsm_dispatcher.male_behavior(bunny, grid, turn, logger)
+            self.male_behavior(bunny, grid, turn, logger)
+            #self.fsm_dispatcher.male_behavior(bunny, grid, turn, logger)
 
     def female_behavior(self, bunny, grid, turn, logger=None):
         neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
@@ -88,7 +96,8 @@ class SLDispatcher:
 
         p_breed = self.female_model.predict_proba([vector])[0][1]
         
-        want_breed = p_breed >= self.threshold
+        #want_breed = p_breed >= self.threshold
+        want_breed = p_breed >= 0.20 # you can tune this threshold based on your model's performance
 
         # Decide what we will actually do (respect feasibility)
         do_breed = want_breed and feasible
@@ -115,21 +124,120 @@ class SLDispatcher:
             grid.place_bunny(baby, x, y)
             if logger:
                 logger.log(turn, "birth", baby, f"Spawned at ({x},{y})", controller="SL")
+        else:            
+            self.move_towards_male(bunny, grid, logger, turn)          
+    
+    def male_behavior(self, bunny, grid, turn, logger=None):
+        neighbors = grid.get_adjacent_bunnies(bunny.x, bunny.y)
+    
+        adjacent_females = [
+            n for n in neighbors
+            if n.sex == "F" and n.is_adult() and not n.is_mutant
+        ]
+    
+        adj_female = int(bool(adjacent_females))
+    
+        female_has_empty = 0
+        for female in adjacent_females:
+            if grid.get_adjacent_empty_tiles(female.x, female.y):
+                female_has_empty = 1
+                break
+            
+        # Feature vector MUST match training order:
+        # [age, mutant, adjacent_adult_female, adjacent_female_has_empty]
+        mut = int(bunny.is_mutant)
+        vector = [bunny.age, mut, adj_female, female_has_empty]
+    
+        p_breed = self.male_model.predict_proba([vector])[0][1]
+        want_breed = p_breed >= self.threshold
+    
+        feasible = bool(adj_female and female_has_empty)
+        do_breed = want_breed and feasible
+        exec_action = "attempted_breeding" if do_breed else "move"
+    
+        if logger:
+            logger.log(
+                turn,
+                "decision",
+                bunny,
+                f"age={bunny.age} mutant={mut} adj_female={adj_female} "
+                f"female_has_empty={female_has_empty} p_breed={p_breed:.2f} "
+                f"want={'breed' if want_breed else 'move'} "
+                f"feasible={int(feasible)} exec={exec_action}",
+                controller="SL",
+            )
+    
+        if do_breed:
+            female = adjacent_females[0]
+    
+            if logger:
+                logger.log(
+                    turn,
+                    "attempted_breeding",
+                    bunny,
+                    f"Attempted to breed with female at ({female.x},{female.y})",
+                    controller="SL",
+                )
         else:
+            empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
+    
             if not empty_tiles:
-                return  # no move possible
-            if not males:
-                # If no males, move randomly
+                return
+    
+            all_females = [
+                b for b in grid.bunnies
+                if b.sex == "F" and b.is_adult() and not b.is_mutant
+            ]
+    
+            if not all_females:
                 self.move_randomly(bunny, grid, logger, turn)
-            else:   
-                best_tile = min(empty_tiles, 
-                                key=lambda tile: min(
-                                    abs(tile[0] - m.x) + abs(tile[1] - m.y) 
-                                    for m in  males))
-                bunny.move(best_tile[0] - bunny.x, best_tile[1] - bunny.y, grid)
-                if logger:
-                    logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="SL")           
+                return
+    
+           # best_tile = min(
+           #     empty_tiles,
+           #     key=lambda tile: min(
+           #         abs(tile[0] - f.x) + abs(tile[1] - f.y)
+           #         for f in all_females
+           #     )
+           # )
+            best_tile = self.choose_safest_target_tile(empty_tiles, all_females, grid)
+    
+            bunny.move(best_tile[0] - bunny.x, best_tile[1] - bunny.y, grid)
+    
+            if logger:
+                logger.log(
+                    turn,
+                    "move",
+                    bunny,
+                    f"Moved to ({bunny.x},{bunny.y})",
+                    controller="SL",
+                )
+            
+
+
+    def move_towards_male(self, bunny, grid, logger, turn):
+        empty_tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
+        if not empty_tiles:
+            return  # no move possible  
         
+        # Move towards nearest male if any, otherwise move randomly
+        all_males = [b for b in grid.bunnies if b.sex == "M" and b.is_adult() and not b.is_mutant]
+        if not all_males:
+            self.move_randomly(bunny, grid, logger, turn)
+            return  
+        
+        # Find the empty tile that is closest to any male 
+        #best_tile = min(empty_tiles, 
+        #                key=lambda tile: min(
+        #                    abs(tile[0] - m.x) + abs(tile[1] - m.y) 
+        #                    for m in  all_males))
+        best_tile = self.choose_safest_target_tile(empty_tiles, all_males, grid)
+
+        bunny.move(best_tile[0] - bunny.x, best_tile[1] - bunny.y, grid)
+        if logger:
+            logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="SL")
+
+
     def move_randomly(self, bunny, grid, logger, turn):
         tiles = grid.get_adjacent_empty_tiles(bunny.x, bunny.y)
         if tiles:
@@ -137,3 +245,41 @@ class SLDispatcher:
             bunny.move(dx - bunny.x, dy - bunny.y, grid)
             if logger:
                 logger.log(turn, "move", bunny, f"Moved to ({bunny.x},{bunny.y})", controller="SL")   
+    
+    def count_adjacent_mutants(self, x, y, grid):
+        neighbors = grid.get_adjacent_bunnies(x, y)
+        return sum(1 for n in neighbors if n.is_mutant)
+    
+    def choose_safest_target_tile(self, empty_tiles, targets, grid):
+        best_tile = None
+        best_score = float("inf")
+
+        for tile in empty_tiles:
+
+            distance = min(
+                abs(tile[0] - t.x) + abs(tile[1] - t.y)
+                for t in targets
+            )
+
+            mutant_count = self.count_adjacent_mutants(
+                tile[0],
+                tile[1],
+                grid
+            )
+
+            score = distance + self.mutant_penalty * mutant_count
+
+            if score < best_score:
+                best_score = score
+                best_tile = tile
+            
+            # print(
+            #     f"tile={tile} "
+            #     f"dist={distance} "
+            #     f"mutants={mutant_count} "
+            #     f"score={score}"
+            # )
+
+        return best_tile
+        
+        
