@@ -65,7 +65,8 @@ class Bunny:
         if grid.is_empty(new_x, new_y):
             grid.cells[self.y][self.x] = None # Update grid cell
             self.x = new_x
-            self.y = new_y                      
+            self.y = new_y
+            grid.cells[new_y][new_x] = self
             return True
         return False
 

@@ -9,8 +9,20 @@ from core.logger import EventLogger
 from core.fsm_dispatcher import FSMDispatcher
 from core.sl_dispatcher import SLDispatcher
 
-# constants MODE for FSM, RL, and SL 
-MODE = "SL"  # Change to "RL" or "FSM" as needed
+# Available controllers are FSM and SL.
+MODE = "SL"
+
+
+def create_dispatcher(mode):
+    if mode == "FSM":
+        return FSMDispatcher()
+    if mode == "SL":
+        try:
+            return SLDispatcher()
+        except FileNotFoundError as error:
+            print(f"{error}\nFalling back to FSM mode.")
+            return FSMDispatcher()
+    raise ValueError("Invalid MODE. Choose 'FSM' or 'SL'.")
 
 def main():
     pygame.init()
@@ -19,20 +31,14 @@ def main():
 
     grid = Grid(screen)
     
-    # Initialize the appropriate dispatcher based on MODE
-    if MODE == "FSM":
-        dispatcher = FSMDispatcher()
-    elif MODE == "RL":        
-        dispatcher = RLDispatcher()
-    elif MODE == "SL":
-        dispatcher = SLDispatcher()
-    else:
-        raise ValueError("Invalid MODE. Choose 'FSM', 'RL', or 'SL'.")
+    dispatcher = create_dispatcher(MODE)
     
     logger = EventLogger()
 
     font = pygame.font.SysFont(None, 24)
     clock = pygame.time.Clock()
+    simulation_interval_ms = 500
+    last_simulation_tick = pygame.time.get_ticks() - simulation_interval_ms
 
     turn = 0
     max_population = 0
@@ -52,8 +58,10 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        # Simulation step every 500ms
-        if turn == 0 or pygame.time.get_ticks() % 500 < 20:
+        # Run at most one simulation step per interval, even after a slow frame.
+        current_tick = pygame.time.get_ticks()
+        if current_tick - last_simulation_tick >= simulation_interval_ms:
+            last_simulation_tick = current_tick
             turn += 1     
 
             # Target: 75% grid occupancy
@@ -90,7 +98,7 @@ def main():
                 count_min = True    
             
             # --- HUD Metrics ---
-            adults = sum(1 for b in grid.bunnies if b.is_adult)
+            adults = sum(1 for b in grid.bunnies if b.is_adult())
             mutants = sum(1 for b in grid.bunnies if b.is_mutant)
             max_population = max(max_population, len(grid.bunnies))
             fps_display = f"{fps:.1f}" if fps > 1.0 else "--"

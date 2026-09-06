@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: Set the number of runs
-set RUNS=10
+set RUNS=1000
 
 :: Loop counter
 set COUNT=1

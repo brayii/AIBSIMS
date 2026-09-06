@@ -12,17 +12,19 @@ class SLDispatcher:
         os.makedirs(model_path, exist_ok=True)
         female_model_path = os.path.join(model_path, "female_sl_logreg.joblib") 
         male_model_path = os.path.join(model_path, "male_sl_logreg.joblib")
-        if not os.path.exists(female_model_path):
-            print(f"Model file {female_model_path} not found. Please train the model and save it to this path.")
-            exit(1)
-        else:     
-            self.female_model = load(female_model_path)
-        
-        if not os.path.exists(male_model_path):
-            print(f"Model file {male_model_path} not found. Please train the model and save it to this path.")
-            exit(1)
-        else:
-            self.male_model = load(male_model_path)
+        missing_models = [
+            path for path in (female_model_path, male_model_path)
+            if not os.path.exists(path)
+        ]
+        if missing_models:
+            missing = ", ".join(missing_models)
+            raise FileNotFoundError(
+                f"SL model file(s) not found: {missing}. "
+                "Run supervised_learning_trainer.py to create them."
+            )
+
+        self.female_model = load(female_model_path)
+        self.male_model = load(male_model_path)
 
         self.fsm_dispatcher = FSMDispatcher()  # Create an instance of FSMDispatcher to reuse its methods
         self.threshold = 0.3  # you can tune this threshold based on your model's performance
@@ -281,5 +283,3 @@ class SLDispatcher:
             # )
 
         return best_tile
-        
-        

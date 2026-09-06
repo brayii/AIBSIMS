@@ -1,114 +1,74 @@
-# 🐇 Bunny Simulator
+# Bunny Simulator — Machine Learning Requirements
 
-A 2D visual grid-based simulation where autonomous bunnies live, move, mutate, and breed according to defined behavioral rules. Driven by finite state machines (FSMs), this simulation is written in Python and designed for future expansion with reinforcement learning and adaptive agent behaviors.
+## Purpose
 
----
+Build a two-dimensional bunny population simulator in Python. This is a machine-learning project: learned models must control the important adult-bunny decisions during the simulation.
 
-## 🚀 Features
+An implementation that controls every bunny only with hard-coded rules or a finite-state machine does not satisfy this project.
 
-- 🧠 Rule-based finite state machines (FSM) for all bunny types
-- 🐇 Four agent types: Adult Male, Adult Female, Juvenile, Vampire
-- 🕹️ Grid-based movement and interactions
-- 👁️ Visual simulation planned with Pygame (2D)
-- 🔄 Simulation turn loop with step-based progression
-- 🔜 Future ML integration for agent learning
+## Required technology
 
----
+- Python 3.10 or newer
+- Pygame for the visual grid and simulation display
+- NumPy and pandas for preparing training data
+- scikit-learn for training and inference
+- joblib for saving and loading trained models
+- Dependencies must be listed in `requirements.txt`
 
-## 🧠 FSM Behavior Diagrams
+## Simulation requirements
 
-Behavior of each bunny type is documented using PlantUML FSM diagrams.
+The program must:
 
-| Bunny Type    | Diagram File                        |
-|---------------|--------------------------------------|
-| Adult Female  | `fsm/adult_female_fsm.puml`         |
-| Adult Male    | `fsm/adult_male_fsm.puml`           |
-| Vampire       | `fsm/vampire_fsm.puml`              |
-| Juvenile      | `fsm/juvenile_fsm.puml`             |
-| FSM Index     | `fsm/fsm_index.md`                  |
+1. Display a bounded, tile-based grid using Pygame.
+2. Maintain one authoritative population of bunnies and prevent two bunnies from occupying the same tile.
+3. Give every bunny a unique identifier, name, sex, age, position, color, and mutation status.
+4. Begin with both male and female bunnies.
+5. Advance in discrete simulation turns.
+6. Age each living bunny once per turn.
+7. Treat a bunny as an adult when it reaches the configured adult age.
+8. Remove bunnies that exceed their allowed lifespan.
+9. Allow movement only to an empty adjacent tile inside the grid.
+10. Allow an adult female to reproduce only when an eligible adult male and an empty adjacent tile are available.
+11. Create offspring with a sex, inherited color, and configurable chance of mutation.
+12. Allow mutant bunnies to infect nearby non-mutant bunnies.
+13. Control excessive population growth before the grid becomes full.
+14. Show the current turn, total population, adult count, mutant count, and maximum population.
 
-> 🧩 Use the [PlantUML VS Code Extension](https://marketplace.visualstudio.com/items?itemName=jebbs.plantuml) to view `.puml` diagrams directly in your editor.
+## Machine-learning requirements
 
----
+Machine learning is mandatory, not an optional future enhancement.
 
-## 🗂️ File Structure
+The implementation must:
 
-bunny_simulator/
-├── core/ # Core logic and agent behavior
-│ ├── bunny.py
-│ ├── grid.py
-│ └── fsm_dispatcher.py # (Planned)
-│
-├── fsm/ # FSM behavior diagrams (PlantUML)
-│ ├── *.puml
-│ └── fsm_index.md
-│
-├── data/
-│ └── logs/ # Birth, death, mutation logs
-│
-├── main.py # Simulation launcher
-├── README.md # This file
-├── .gitignore # Git exclusions
-└── requirements.txt # Dependencies (e.g. pygame)
+1. Record simulation events as training data, including the turn, bunny attributes, position, nearby conditions, selected action, and controller.
+2. Build features from the state available at the moment a decision is made. Training must not use future information.
+3. Train at least one supervised-learning model that predicts an adult bunny action.
+4. Use trained models during the live simulation to control adult male and adult female decisions such as moving or attempting to breed.
+5. Apply physical constraints after prediction. A model may request breeding, but the simulator must reject that action when no valid mate or empty tile exists.
+6. Save trained models to disk and load them for inference without retraining on every launch.
+7. Use the same feature names, order, types, and meaning during training and inference.
+8. Split training and test data reproducibly and report evaluation results such as a confusion matrix and classification metrics.
+9. Handle missing or invalid model files with a clear message. A temporary rule-based fallback may keep the program usable, but it must not be presented as the completed ML implementation.
+10. Keep rule-based behavior limited to environmental rules, validation, initialization, and simple non-learned behaviors. Hard-coded adult decision logic must not replace the trained model.
 
+## Data and model requirements
 
----
+- Training logs belong under `data/logs/`.
+- Saved models belong under `models/`.
+- Generated logs and model artifacts should not be committed unless they are intentionally provided as reproducible sample assets.
+- The training program must fail clearly when no usable training data exists or when the data contains too few classes to train and evaluate a classifier.
+- Random operations used for training and evaluation must accept a fixed seed for reproducibility.
 
-## 📦 Requirements
+## Quality requirements
 
-- Python 3.10+
-- Pygame (`pip install pygame`)
-- PlantUML (for diagrams, optional)
-- VS Code recommended (for live preview, Git integration)
+- Grid cells and bunny coordinates must remain synchronized after placement, movement, birth, mutation, removal, and population control.
+- The simulation must not crash when no move, mate, or breeding tile is available.
+- Resource files and log files must be closed cleanly.
+- Core behavior must have automated tests, including movement, occupied-tile protection, aging and death, breeding constraints, model loading, and training/inference feature consistency.
+- The project must start from a clean checkout after installing `requirements.txt` and either loading supplied models or following documented training steps.
 
-Install dependencies:
+## Completion criteria
 
-```bash
-python -m venv env
-source env/Scripts/activate  # or .\env\Scripts\activate.bat on Windows
-pip install -r requirements.txt
+The simulator is complete when it runs visually, maintains a valid population and grid, produces usable training data, trains and evaluates its models, reloads those models, and uses their predictions to make adult-bunny decisions during a live simulation.
 
-.\venv\Scripts\activate.bat
-py -m pip install -r requirements.txt
-
-🧪 Running the Simulation
-
-python main.py
-
-This launches the simulation grid and processes turns (1 per ~2 seconds). Bunnies will move, age, and eventually mutate or breed based on the FSM logic.
-
-Visual output and interaction will be added in the Pygame module (coming soon).
-
-🎯 Development Goals
- FSMs defined and versioned
-
- Project structure and Git initialized
-
- Visual grid display (Pygame)
-
- Turn-based simulation loop
-
- FSM integration per bunny type
-
- Logging and replay system
-
- ML module (Phase 2)
-
-🤝 Contributing
-Clone this repo and help expand the ecosystem!
-
-git clone https://github.com/yourusername/bunny_simulator.git
-
-Use the fsm/ directory to propose behavioral changes via .puml updates. Logic changes should align with FSMs.
-
-🧠 Credits
-FSM-based AI design inspired by classic agent simulations
-
-Diagrams built with PlantUML
-
-Simulation designed and built in Python 3
-
-📄 License
-MIT License (add LICENSE file if applicable)
-
-
+The project is not complete if the ML code is unused, if adult behavior is entirely hard-coded, or if the simulator only demonstrates an FSM implementation.

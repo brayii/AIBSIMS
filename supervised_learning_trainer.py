@@ -206,7 +206,7 @@ for turn in sorted(df["turn"].unique()):
                 if 0 <= pos[0] < GRID_WIDTH and 0 <= pos[1] < GRID_HEIGHT
             ]  
 
-            if any(pos not in occupied_positions for pos in adjacent_positions):
+            if any(pos not in occupied_positions for pos in female_adjacent_positions):
                 female_has_empty = True
                 break
 
@@ -490,8 +490,3 @@ print(f"{'bias':>20}: {bias_male: .4f}")
 # 
 #     y = 1 if row["event_type"] == "breeding" else 0
 #     print(f"Features: {X}, Label: {y}")
-
-   
-
-
- 
